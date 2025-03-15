@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+    <ItemGroup>
+        <Reference Include="G:\GOG Games\Timberborn\Timberborn_Data\Managed\publicized_assemblies\T*.dll"/>
+        <Reference Include="G:\GOG Games\Timberborn\Timberborn_Data\Managed\publicized_assemblies\U*.dll"/>
+        <Reference Include="G:\GOG Games\Timberborn\Timberborn_Data\Managed\publicized_assemblies\B*.dll"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Reference Include="0Harmony">
+            <HintPath>D:\OneDrive\Dokumente\Timberborn\Mods\harmony_4149561_2.3.3\0Harmony.dll</HintPath>
+        </Reference>
+        <Reference Include="TimberUi">
+            <HintPath>D:\OneDrive\Dokumente\Timberborn\Mods\TimberUI\version-0.7\TimberUi.dll</HintPath>
+        </Reference>
+    </ItemGroup>
+</Project>
