@@ -1,14 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net6.0</TargetFramework>
+        <TargetFramework>netstandard2.1</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <LangVersion>10</LangVersion>
     </PropertyGroup>
     <ItemGroup>
         <Reference Include="G:\GOG Games\Timberborn\Timberborn_Data\Managed\publicized_assemblies\T*.dll"/>
         <Reference Include="G:\GOG Games\Timberborn\Timberborn_Data\Managed\publicized_assemblies\U*.dll"/>
         <Reference Include="G:\GOG Games\Timberborn\Timberborn_Data\Managed\publicized_assemblies\B*.dll"/>
+        <Reference Include="G:\GOG Games\Timberborn\Timberborn_Data\Managed\System.Collections.Immutable.dll" />
     </ItemGroup>
 
     <ItemGroup>
@@ -18,5 +20,9 @@
         <Reference Include="TimberUi">
             <HintPath>D:\OneDrive\Dokumente\Timberborn\Mods\TimberUI\version-0.7\TimberUi.dll</HintPath>
         </Reference>
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="NumSharp" Version="0.30.0" />
     </ItemGroup>
 </Project>

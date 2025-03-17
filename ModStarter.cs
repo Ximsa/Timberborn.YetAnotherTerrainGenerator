@@ -3,14 +3,18 @@ using HarmonyLib;
 using Timberborn.ModManagerScene;
 using UnityEngine;
 
-namespace Timberborn.TerrainGenerator
+namespace Timberborn.TerrainGenerator;
+
+public class ModStarter : IModStarter
 {
-    public class ModStarter : IModStarter
+    public static string OriginPath = string.Empty;
+    public static string ModPath = string.Empty;
+
+    public void StartMod(IModEnvironment modEnvironment)
     {
-        public void StartMod(IModEnvironment modEnvironment)
-        {
-            Debug.Log("Hello TerrainGenerator!");
-            new Harmony("Timberborn.TerrainGenerator").PatchAll();
-        }
+        ModPath = modEnvironment.ModPath;
+        OriginPath = modEnvironment.OriginPath;
+        Debug.Log($"Hello TerrainGenerator! Paths: {ModPath} {OriginPath}");
+        new Harmony("Timberborn.TerrainGenerator").PatchAll();
     }
 }
