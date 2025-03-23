@@ -25,8 +25,6 @@ public static class ReflectionExtensions
         var field = obj.GetType().GetField(eventName, BindingFlags);
         var eventDelegate = (MulticastDelegate)field!.GetValue(obj);
         foreach (var handler in eventDelegate.GetInvocationList())
-        {
             handler.Method.Invoke(handler.Target, new[] { obj, eventArgs });
-        }
     }
 }

@@ -34,6 +34,8 @@ public class MapEditorService
         this.terrainService = terrainService;
     }
 
+    public Vector3Int MapSize => terrainService.Size;
+
     public void RemoveAllEntityComponents()
     {
         var worldBlocks = blockService.GetFieldValue<Array3D<WorldBlock>>("_blocks");
@@ -75,5 +77,18 @@ public class MapEditorService
         mapEditorSceneLoader.LoadMap(MapFileReference.FromUserFolder("generated"));
     }
 
-    public Vector3Int MapSize => terrainService.Size;
+    public void Set2DTerrain(NDArray heightmap)
+    {
+        heightmap = heightmap.astype(np.int32);
+        for (var i = 0; i < MapSize.y; i++)
+        for (var j = 0; j < MapSize.x; j++)
+        {
+            var height = terrainService.CellHeight(new Vector2Int(j, i));
+            var targetHeight = (int)heightmap[i, j];
+            if (height > targetHeight)
+                terrainService.UnsetTerrain(new Vector3Int(j, i, height), height - targetHeight + 1);
+            else
+                terrainService.SetTerrain(new Vector3Int(j, i, height), targetHeight - height);
+        }
+    }
 }

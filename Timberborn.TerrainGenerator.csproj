@@ -10,7 +10,7 @@
         <Reference Include="G:\GOG Games\Timberborn\Timberborn_Data\Managed\publicized_assemblies\T*.dll"/>
         <Reference Include="G:\GOG Games\Timberborn\Timberborn_Data\Managed\publicized_assemblies\U*.dll"/>
         <Reference Include="G:\GOG Games\Timberborn\Timberborn_Data\Managed\publicized_assemblies\B*.dll"/>
-        <Reference Include="G:\GOG Games\Timberborn\Timberborn_Data\Managed\System.Collections.Immutable.dll" />
+        <Reference Include="G:\GOG Games\Timberborn\Timberborn_Data\Managed\System.Collections.Immutable.dll"/>
     </ItemGroup>
 
     <ItemGroup>
@@ -23,6 +23,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="NumSharp" Version="0.30.0" />
+        <PackageReference Include="NumSharp" Version="0.30.0"/>
     </ItemGroup>
 </Project>

@@ -1,9 +1,15 @@
 ID,Text,Comment
 Ximsa.TerrainGenerator.Title,"Terrain Generator",-
-Ximsa.TerrainGenerator.Heightmap,"Use 2D generation",-
-Ximsa.TerrainGenerator.Encoder,"Use current terrain as seed",-
+Ximsa.TerrainGenerator.Encoder,"Current Terrain Multiplier",-
 Ximsa.TerrainGenerator.Noise,"Add noise",-
-Ximsa.TerrainGenerator.NoiseStd,"Standart deviation",-
+Ximsa.TerrainGenerator.NoiseStd,"Noise Multiplier",-
 Ximsa.TerrainGenerator.NoiseMean,"Mean",-
-Ximsa.TerrainGenerator.Filter,"Apply gaussian filter",-
+Ximsa.TerrainGenerator.Filter,"Apply Gaussian Filter",-
 Ximsa.TerrainGenerator.Generate,"Generate Terrain",-
+Ximsa.TerrainGenerator.MedianBlurPasses,"Number of Median Filter Passes",-
+Ximsa.TerrainGenerator.MedianBlurRadius,"Radius of the Median Filter",-
+Ximsa.TerrainGenerator.MedianBlurTitle,"Global Median Blur",-
+Ximsa.TerrainGenerator.Apply,"Apply",-
+Ximsa.TerrainGenerator.ZoomFactor,"Zoom Factor",-
+Ximsa.TerrainGenerator.Cancel,"Cancel",-
+Ximsa.TerrainGenerator.MaxHeight,"Maximum Terrain Height",-
