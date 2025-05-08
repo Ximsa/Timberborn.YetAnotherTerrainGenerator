@@ -18,7 +18,7 @@
             <HintPath>D:\OneDrive\Dokumente\Timberborn\Mods\harmony_4149561_2.3.3\0Harmony.dll</HintPath>
         </Reference>
         <Reference Include="TimberUi">
-            <HintPath>D:\OneDrive\Dokumente\Timberborn\Mods\TimberUI\version-0.7\TimberUi.dll</HintPath>
+            <HintPath>D:\OneDrive\Dokumente\Timberborn\Mods\timberui_4764523_7.2.0\version-0.7\TimberUi.dll</HintPath>
         </Reference>
     </ItemGroup>
 

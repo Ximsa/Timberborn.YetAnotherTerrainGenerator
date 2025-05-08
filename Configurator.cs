@@ -7,7 +7,7 @@ namespace Timberborn.TerrainGenerator;
 [Context("MainMenu")]
 public class MainMenuConfigurator : Configurator
 {
-    public override void Configure()
+    protected override void Configure()
     {
     }
 }
@@ -15,7 +15,7 @@ public class MainMenuConfigurator : Configurator
 [Context("Game")]
 public class GameConfigurator : Configurator
 {
-    public override void Configure()
+    protected override void Configure()
     {
     }
 }
@@ -23,7 +23,7 @@ public class GameConfigurator : Configurator
 [Context("MapEditor")]
 public class MapEditorConfigurator : Configurator
 {
-    public override void Configure()
+    protected override void Configure()
     {
         Bind<TerrainGeneratorButton>().AsTransient();
         Bind<TerrainFilterButton>().AsTransient();

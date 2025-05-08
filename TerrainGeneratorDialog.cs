@@ -1,7 +1,6 @@
 using NumSharp;
 using Timberborn.Localization;
 using TimberUi.CommonUi;
-using UiBuilder.CommonUi;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -17,8 +16,8 @@ public class TerrainGeneratorDialog : DialogBoxElement
     private const string NoiseStdKey = "Ximsa.TerrainGenerator.NoiseStd";
     private const string NoiseMeanKey = "Ximsa.TerrainGenerator.NoiseMean";
     private const string GenerateKey = "Ximsa.TerrainGenerator.Generate";
-    private const string MedianBlurPassesKey = "Ximsa.TerrainGenerator.MedianBlurPasses";
-    private const string MedianBlurRadiusKey = "Ximsa.TerrainGenerator.MedianBlurRadius";
+    private const string MedianBlurPassesKey = "Ximsa.TerrainGenerator.Passes";
+    private const string MedianBlurRadiusKey = "Ximsa.TerrainGenerator.Radius";
     private const string MedianBlurTitleKey = "Ximsa.TerrainGenerator.MedianBlurTitle";
     private const string ZoomFactorKey = "Ximsa.TerrainGenerator.ZoomFactor";
     private const string MaxHeightKey = "Ximsa.TerrainGenerator.MaxHeight";
@@ -26,12 +25,12 @@ public class TerrainGeneratorDialog : DialogBoxElement
     private readonly MapEditorService mapEditorService;
 
     private float encoderBias = -1;
+    private int maxTerrainHeight;
     private int medianBlurPasses = 1;
     private int medianBlurRadius = 4;
     private float noiseMean;
     private float noiseStd = 1;
     private float zoomFactor = 1.25f;
-    private int maxHeight = 1;
 
 
     public TerrainGeneratorDialog(
@@ -72,11 +71,11 @@ public class TerrainGeneratorDialog : DialogBoxElement
             .SetHorizontalSlider(new SliderValues<float>(1, 8, zoomFactor))
             .RegisterChange(zoomFactor => this.zoomFactor = zoomFactor)
             .AddEndLabel(value => $"{value:G3}"));
-        this.maxHeight = mapEditorService.MapSize.z;
+        maxTerrainHeight = mapEditorService.MapSize.z;
         Content.Add(new GameSliderInt()
             .SetLabel($"{loc.T(MaxHeightKey)}")
             .SetHorizontalSlider(new SliderValues<int>(1, mapEditorService.MapSize.z, mapEditorService.MapSize.z))
-            .RegisterChange(maxHeight => this.maxHeight = maxHeight)
+            .RegisterChange(maxHeight => maxTerrainHeight = maxHeight)
             .AddEndLabel(value => $"{value}"));
         Content.AddButton(loc.T(GenerateKey), GenerateKey, OnGenerate);
         AddCloseButton();
@@ -150,7 +149,7 @@ public class TerrainGeneratorDialog : DialogBoxElement
 
         // normalize
         decoded -= decoded.min();
-        decoded = decoded / decoded.max() * (maxHeight - 1.0f);
+        decoded = decoded / decoded.max() * (maxTerrainHeight - 1.0f);
 
         // set terrain
         return decoded;

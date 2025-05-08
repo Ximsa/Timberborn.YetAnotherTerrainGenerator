@@ -4,7 +4,7 @@ Ximsa.TerrainGenerator.Encoder,"Current Terrain Multiplier",-
 Ximsa.TerrainGenerator.Noise,"Add noise",-
 Ximsa.TerrainGenerator.NoiseStd,"Noise Multiplier",-
 Ximsa.TerrainGenerator.NoiseMean,"Mean",-
-Ximsa.TerrainGenerator.Filter,"Apply Gaussian Filter",-
+Ximsa.TerrainGenerator.FilterTitle,"Filter Tool",-
 Ximsa.TerrainGenerator.Generate,"Generate Terrain",-
 Ximsa.TerrainGenerator.MedianBlurPasses,"Number of Median Filter Passes",-
 Ximsa.TerrainGenerator.MedianBlurRadius,"Radius of the Median Filter",-
@@ -13,3 +13,6 @@ Ximsa.TerrainGenerator.Apply,"Apply",-
 Ximsa.TerrainGenerator.ZoomFactor,"Zoom Factor",-
 Ximsa.TerrainGenerator.Cancel,"Cancel",-
 Ximsa.TerrainGenerator.MaxHeight,"Maximum Terrain Height",-
+Ximsa.TerrainGenerator.SharpenTitle,"Sharpening Tool",-
+Ximsa.TerrainGenerator.SharpenStrength,"Sharpening Strength",-
+Ximsa.TerrainGenerator.SharpenSize,"Sharpening Kernel Range",-
