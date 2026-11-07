@@ -10,7 +10,7 @@ public sealed class CliffSharpenerSettings
     // regions smaller than this many tiles are merged into the neighbour with the closest height
     public int MinRegionArea = 32;
 
-    // plateau heights are multiples of this; it is also the smallest cliff height
+    // smallest height difference between neighbouring plateaus, i.e. the lowest cliff; plateaus can be at any height
     public int StepSize = 2;
 
     // 0 keeps the original surface, 1 flattens fully to the plateau heights
@@ -19,7 +19,8 @@ public sealed class CliffSharpenerSettings
 
 // Splits a surface into flat plateaus with cliffs between them, like typical Timberborn maps: watershed regions of
 // the smoothed surface's slope (so region borders run along the steepest ground), small regions merged into their
-// closest-height neighbour, and each region flattened to its median height snapped to the step size.
+// closest-height neighbour, each region flattened to its median height, and neighbouring plateaus closer in height
+// than the step size merged, so plateaus can lie at any height but every cliff is at least one step high.
 public sealed class CliffSharpener
 {
     private static readonly (int X, int Y)[] Neighbours =
@@ -276,33 +277,98 @@ public sealed class CliffSharpener
         }
     }
 
+    // each region gets the median of its original heights, even or odd; neighbouring regions whose heights differ by
+    // less than the step size are merged (closest heights first, the merged region taking the median of both), so every
+    // cliff is at least one step high. Returns the plateau height per region of the input.
     private int[] PlateauHeights(int[] regions, int[] heights)
     {
+        var count = RegionCount;
         var maxHeight = heights.Max();
-        var histograms = new int[RegionCount, maxHeight + 1];
-        var areas = new int[RegionCount];
+        var histograms = new int[count][];
+        var areas = new int[count];
+        for (var region = 0; region < count; region++)
+            histograms[region] = new int[maxHeight + 1];
         for (var i = 0; i < regions.Length; i++)
         {
-            histograms[regions[i], heights[i]]++;
+            histograms[regions[i]][heights[i]]++;
             areas[regions[i]]++;
         }
 
-        var plateau = new int[RegionCount];
-        for (var region = 0; region < RegionCount; region++)
+        // neighbouring regions along 4-connected tile borders; kept only for regions that were not merged away
+        var neighbours = new HashSet<int>?[count];
+        for (var region = 0; region < count; region++)
+            neighbours[region] = new HashSet<int>();
+        for (var y = 0; y < sizeY; y++)
+        for (var x = 0; x < sizeX; x++)
         {
-            var median = 0;
-            for (int height = 0, seen = 0; height <= maxHeight; height++)
-            {
-                seen += histograms[region, height];
-                if (seen * 2 < areas[region]) continue;
-                median = height;
-                break;
-            }
-
-            var step = settings.StepSize;
-            plateau[region] = Math.Max(1, (int)Math.Round((double)median / step, MidpointRounding.AwayFromZero) * step);
+            var a = regions[y * sizeX + x];
+            if (x + 1 < sizeX) Connect(a, regions[y * sizeX + x + 1]);
+            if (y + 1 < sizeY) Connect(a, regions[(y + 1) * sizeX + x]);
         }
 
-        return plateau;
+        var parent = Enumerable.Range(0, count).ToArray();
+        var plateau = Enumerable.Range(0, count).Select(Median).ToArray();
+        while (true)
+        {
+            int bestA = -1, bestB = -1, bestDifference = int.MaxValue;
+            for (var a = 0; a < count; a++)
+            {
+                if (neighbours[a] == null) continue;
+                foreach (var b in neighbours[a]!)
+                {
+                    var difference = Math.Abs(plateau[a] - plateau[b]);
+                    if (b <= a || difference == 0 || difference >= settings.StepSize || difference >= bestDifference)
+                        continue;
+                    (bestA, bestB, bestDifference) = (a, b, difference);
+                }
+            }
+
+            if (bestA < 0) break;
+            // the smaller region joins the larger one
+            var (keep, gone) = areas[bestA] >= areas[bestB] ? (bestA, bestB) : (bestB, bestA);
+            for (var height = 0; height <= maxHeight; height++)
+                histograms[keep][height] += histograms[gone][height];
+            areas[keep] += areas[gone];
+            parent[gone] = keep;
+            foreach (var other in neighbours[gone]!)
+            {
+                neighbours[other]!.Remove(gone);
+                if (other == keep) continue;
+                neighbours[other]!.Add(keep);
+                neighbours[keep]!.Add(other);
+            }
+
+            neighbours[gone] = null;
+            plateau[keep] = Median(keep);
+        }
+
+        RegionCount = neighbours.Count(set => set != null);
+        return Enumerable.Range(0, count).Select(region => plateau[Find(region)]).ToArray();
+
+        void Connect(int a, int b)
+        {
+            if (a == b) return;
+            neighbours[a]!.Add(b);
+            neighbours[b]!.Add(a);
+        }
+
+        int Median(int region)
+        {
+            for (int height = 0, seen = 0; height <= maxHeight; height++)
+            {
+                seen += histograms[region][height];
+                if (seen * 2 >= areas[region])
+                    return Math.Max(1, height);
+            }
+
+            return 1;
+        }
+
+        int Find(int region)
+        {
+            while (parent[region] != region)
+                region = parent[region];
+            return region;
+        }
     }
 }

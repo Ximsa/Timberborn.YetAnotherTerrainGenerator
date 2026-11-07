@@ -96,7 +96,10 @@ The terrain tools work on a heightmap, but must not destroy 3D terrain:
 - Regions smaller than the minimum region area merge into the neighbour with the closest mean height, but only when
   that neighbour is less than one step away (real small peaks and pits stay, specks under a quarter of the minimum
   area always merge).
-- Each region gets the median of its original surface heights, snapped to the step size (halves round up).
+- Each region gets the median of its original surface heights, even or odd. Neighbouring regions whose heights
+  differ by less than the step size are merged (closest first, taking the median of both), so plateaus can lie at any
+  height but every cliff is at least one step high (2026-11-07; before, heights snapped to multiples of the step, so
+  with step 2 all plateaus were even).
 - No ramps: beavers need stairs for any terrain step anyway.
 - Settings: region size (2..8, default 4), smallest plateau (16..128 tiles, default 32), step size (default 2),
   strength (blend between original and plateau
