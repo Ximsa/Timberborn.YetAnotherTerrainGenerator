@@ -1,8 +1,8 @@
 using System.Diagnostics;
 using System.Globalization;
 using AutoencoderTuner;
-using Timberborn.TerrainGenerator;
-using Timberborn.TerrainGenerator.Generators.Autoencoder;
+using Timberborn.TerrainGenerator.Core.Common;
+using Timberborn.TerrainGenerator.Core.Autoencoder;
 using TerrainPreview;
 
 // Tunes the autoencoder generator's models without retraining.
@@ -107,7 +107,7 @@ static List<(string Name, int[] Heights, int SizeX, int SizeY)> ReadMaps(string 
         using var file = File.OpenRead(path);
         var map = MapVoxelReader.Read(file);
         return (Path.GetFileNameWithoutExtension(path),
-            Timberborn.TerrainGenerator.TerrainTools.Surface.Heights(map), map.SizeX, map.SizeY);
+            Surface.Heights(map), map.SizeX, map.SizeY);
     }).ToList();
 }
 

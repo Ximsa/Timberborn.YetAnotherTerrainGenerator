@@ -9,10 +9,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="../../VoxelMap.cs" Link="Mod/VoxelMap.cs"/>
-        <Compile Include="../../MapVoxelReader.cs" Link="Mod/MapVoxelReader.cs"/>
-        <Compile Include="../../Generators/**/*.cs" Link="Mod/Generators/%(RecursiveDir)%(Filename)%(Extension)"/>
-        <Compile Include="../../TerrainTools/**/*.cs" Link="Mod/TerrainTools/%(RecursiveDir)%(Filename)%(Extension)"/>
+        <Compile Include="../../Core/**/*.cs" Link="Core/%(RecursiveDir)%(Filename)%(Extension)"/>
     </ItemGroup>
 
     <ItemGroup>

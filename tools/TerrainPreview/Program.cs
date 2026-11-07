@@ -1,8 +1,10 @@
 using System.Diagnostics;
-using Timberborn.TerrainGenerator;
-using Timberborn.TerrainGenerator.Generators.Noise3D;
-using Timberborn.TerrainGenerator.Generators.Wfc;
-using Timberborn.TerrainGenerator.TerrainTools;
+using Timberborn.TerrainGenerator.Core.CliffSharpening;
+using Timberborn.TerrainGenerator.Core.Common;
+using Timberborn.TerrainGenerator.Core.Noise3D;
+using Timberborn.TerrainGenerator.Core.Rivers;
+using Timberborn.TerrainGenerator.Core.Trees;
+using Timberborn.TerrainGenerator.Core.Wfc;
 using TerrainPreview;
 
 // Usage:

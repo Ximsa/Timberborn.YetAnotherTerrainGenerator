@@ -1,4 +1,4 @@
-using Timberborn.TerrainGenerator;
+using Timberborn.TerrainGenerator.Core.Common;
 
 namespace TerrainPreview;
 

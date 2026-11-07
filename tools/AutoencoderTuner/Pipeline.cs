@@ -1,4 +1,4 @@
-using Timberborn.TerrainGenerator.Generators.Autoencoder;
+using Timberborn.TerrainGenerator.Core.Autoencoder;
 
 namespace AutoencoderTuner;
 
