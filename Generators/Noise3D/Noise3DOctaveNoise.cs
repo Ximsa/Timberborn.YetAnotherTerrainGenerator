@@ -1,15 +1,16 @@
 namespace Timberborn.TerrainGenerator.Generators.Noise3D;
 
-// Port of Minecraft beta 1.7.3's NoiseGeneratorOctaves: each octave doubles the frequency and halves the amplitude.
-internal sealed class BetaOctaveNoise
+// Octave noise for the 3D Noise generator (based on Minecraft beta 1.7.3's NoiseGeneratorOctaves): each octave
+// doubles the frequency and halves the amplitude.
+internal sealed class Noise3DOctaveNoise
 {
-    private readonly BetaPerlinNoise[] octaves;
+    private readonly Noise3DPerlinNoise[] octaves;
 
-    public BetaOctaveNoise(Random random, int octaveCount)
+    public Noise3DOctaveNoise(Random random, int octaveCount)
     {
-        octaves = new BetaPerlinNoise[octaveCount];
+        octaves = new Noise3DPerlinNoise[octaveCount];
         for (var i = 0; i < octaveCount; i++)
-            octaves[i] = new BetaPerlinNoise(random);
+            octaves[i] = new Noise3DPerlinNoise(random);
     }
 
     // indexed (x * sizeZ + z) * sizeY + y; progress is reported once per octave
@@ -29,7 +30,7 @@ internal sealed class BetaOctaveNoise
         return values;
     }
 
-    // beta's 2D sampling: a single layer at y = 10, indexed x * sizeZ + z
+    // the 3D Noise generator's 2D sampling: a single layer at y = 10, indexed x * sizeZ + z
     public double[] Generate2D(double x, double z, int sizeX, int sizeZ, double scaleX, double scaleZ,
         Action<float>? progress = null)
     {

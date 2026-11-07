@@ -14,7 +14,7 @@ public class Noise3DGeneratorDialog : TerrainJobDialog
     private const string BaseLevelKey = "Ximsa.TerrainGenerator.Noise3D.BaseLevel";
     private const string VerticalScaleKey = "Ximsa.TerrainGenerator.Noise3D.VerticalScale";
     private const string HorizontalScaleKey = "Ximsa.TerrainGenerator.Noise3D.HorizontalScale";
-    private const string BetaBiomesKey = "Ximsa.TerrainGenerator.Noise3D.BetaBiomes";
+    private const string VaryingBiomesKey = "Ximsa.TerrainGenerator.Noise3D.VaryingBiomes";
     private const string GenerateKey = "Ximsa.TerrainGenerator.Generate";
     private const string ClimateKey = "Ximsa.TerrainGenerator.Progress.Climate";
     private const string NoiseKey = "Ximsa.TerrainGenerator.Progress.Noise";
@@ -53,8 +53,8 @@ public class Noise3DGeneratorDialog : TerrainJobDialog
             .SetHorizontalSlider(new SliderValues<float>(1, 6, (float)settings.HorizontalScale))
             .RegisterChange(horizontalScale => settings.HorizontalScale = horizontalScale)
             .AddEndLabel(value => $"{value:F2}"));
-        Content.AddGamePanelToggle(loc.T(BetaBiomesKey), betaBiomes =>
-            settings.Climate = betaBiomes ? Noise3DClimate.BetaBiomes : Noise3DClimate.Rainforest);
+        Content.AddGamePanelToggle(loc.T(VaryingBiomesKey), varyingBiomes =>
+            settings.Climate = varyingBiomes ? Noise3DClimate.VaryingBiomes : Noise3DClimate.Rainforest);
         generateButton = Content.AddButton(loc.T(GenerateKey), GenerateKey, OnGenerate);
         AddProgressBar();
         AddCloseButton();

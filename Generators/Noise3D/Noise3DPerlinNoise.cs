@@ -1,15 +1,16 @@
 namespace Timberborn.TerrainGenerator.Generators.Noise3D;
 
-// Port of Minecraft beta 1.7.3's improved Perlin noise (NoiseGeneratorPerlin), seeded from System.Random.
+// Improved Perlin noise for the 3D Noise generator (based on Minecraft beta 1.7.3's NoiseGeneratorPerlin), seeded from
+// System.Random.
 // Values are added into a flat array indexed (x * sizeZ + z) * sizeY + y, like the original.
-internal sealed class BetaPerlinNoise
+internal sealed class Noise3DPerlinNoise
 {
     private readonly int[] permutations = new int[512];
     private readonly double xOffset;
     private readonly double yOffset;
     private readonly double zOffset;
 
-    public BetaPerlinNoise(Random random)
+    public Noise3DPerlinNoise(Random random)
     {
         xOffset = random.NextDouble() * 256;
         yOffset = random.NextDouble() * 256;
@@ -24,7 +25,7 @@ internal sealed class BetaPerlinNoise
         }
     }
 
-    // adds the noise divided by octaveScale; a size of 1 in y selects beta's cheaper 2D variant
+    // adds the noise divided by octaveScale; a size of 1 in y selects the cheaper 2D variant
     public void Add(double[] values, double x, double y, double z, int sizeX, int sizeY, int sizeZ,
         double scaleX, double scaleY, double scaleZ, double octaveScale)
     {
@@ -59,7 +60,7 @@ internal sealed class BetaPerlinNoise
                     var hashY = cellY & 255;
                     py -= cellY;
                     var fadeY = Fade(py);
-                    // beta only recomputes the corner gradients when the y cell changes (or a column starts)
+                    // 3D Noise only recomputes the corner gradients when the y cell changes (or a column starts)
                     if (iy == 0 || hashY != lastY)
                     {
                         lastY = hashY;

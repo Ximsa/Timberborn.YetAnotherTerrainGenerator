@@ -2,41 +2,41 @@ namespace Timberborn.TerrainGenerator.Generators.Noise3D;
 
 public enum Noise3DClimate
 {
-    // beta's rainforest everywhere: hot and wet, so the hill noise applies in full (beta's hilliest climate)
+    // rainforest everywhere: hot and wet, so the hill noise applies in full (the hilliest climate)
     Rainforest,
 
-    // beta's varying biome climate (temperature and humidity noise), including flat dry areas
-    BetaBiomes
+    // varying biome climate (temperature and humidity noise), including flat dry areas
+    VaryingBiomes
 }
 
 public sealed class Noise3DSettings
 {
-    public const int BetaWorldHeight = 128;
-    public const int BetaSeaLevel = 64;
+    public const int WorldHeight = 128;
+    public const int SeaLevel = 64;
 
     public int Seed;
 
     public Noise3DClimate Climate = Noise3DClimate.Rainforest;
 
-    // beta height that becomes Timberborn height 0 (just below sea level, so oceans become shallow basins)
-    public double BaseLevel = BetaSeaLevel - 8;
+    // 3D Noise height that becomes Timberborn height 0 (just below sea level, so oceans become shallow basins)
+    public double BaseLevel = SeaLevel - 8;
 
-    // beta blocks per Timberborn tile; 0 means "fit base level .. world top into the map height".
-    // 2 keeps beta's hills steep enough for Timberborn's ~23 tiles, only cutting off the rare peaks above 102
+    // 3D Noise blocks per Timberborn tile; 0 means "fit base level .. world top into the map height".
+    // 2 keeps the 3D Noise hills steep enough for Timberborn's ~23 tiles, only cutting off the rare peaks above 102
     public double VerticalScale = 2;
 
-    // beta blocks per Timberborn tile across the map; 0 means "same as the vertical scale"
+    // 3D Noise blocks per Timberborn tile across the map; 0 means "same as the vertical scale"
     public double HorizontalScale;
 
-    // beta's coordinate scale of the 3D limit noises (684.412)
+    // coordinate scale of the 3D limit noises (684.412)
     public double CoordinateScale = 684.412;
 
-    // beta's coordinate scale of the 3D limit noises in height (684.412)
+    // coordinate scale of the 3D limit noises in height (684.412)
     public double HeightScale = 684.412;
 
     public double ResolveVerticalScale(int mapHeight)
     {
-        return VerticalScale > 0 ? VerticalScale : (BetaWorldHeight - BaseLevel) / mapHeight;
+        return VerticalScale > 0 ? VerticalScale : (WorldHeight - BaseLevel) / mapHeight;
     }
 
     public double ResolveHorizontalScale(int mapHeight)
@@ -50,15 +50,15 @@ public sealed class Noise3DSettings
     }
 }
 
-// Port of Minecraft beta 1.7.3's overworld terrain shape (ChunkProviderGenerate), without caves, ores,
-// surface blocks or decorations. Beta computes a density on a coarse grid (every 4 blocks across, 8 blocks up),
+// The 3D Noise generator's terrain shape (based on Minecraft beta 1.7.3's ChunkProviderGenerate), without caves, ores,
+// surface blocks or decorations. 3D Noise computes a density on a coarse grid (every 4 blocks across, 8 blocks up),
 // interpolates it trilinearly, and makes every block with a positive density solid.
-// Timberborn tiles are mapped onto a vertical slice of the beta world, see Noise3DSettings.
+// Timberborn tiles are mapped onto a vertical slice of the 3D Noise world, see Noise3DSettings.
 public sealed class Noise3DTerrainGenerator
 {
     private const int CellWidth = 4;
     private const int CellHeight = 8;
-    private const int GridHeight = Noise3DSettings.BetaWorldHeight / CellHeight + 1;
+    private const int GridHeight = Noise3DSettings.WorldHeight / CellHeight + 1;
 
     private readonly double baseLevel;
     private readonly double horizontalScale;
@@ -84,27 +84,27 @@ public sealed class Noise3DTerrainGenerator
         baseLevel = settings.BaseLevel;
         verticalScale = settings.ResolveVerticalScale(sizeZ);
         horizontalScale = settings.ResolveHorizontalScale(sizeZ);
-        // grid points needed to cover the map; Timberborn y runs along beta z
+        // grid points needed to cover the map; Timberborn y runs along 3D Noise z
         gridX = (int)Math.Ceiling(sizeX * horizontalScale / CellWidth) + 2;
         gridZ = (int)Math.Ceiling(sizeY * horizontalScale / CellWidth) + 2;
     }
 
-    // biome temperature and humidity at every grid column (beta's WorldChunkManager)
+    // biome temperature and humidity at every grid column (the original's WorldChunkManager)
     public void ComputeClimate()
     {
         if (settings.Climate == Noise3DClimate.Rainforest)
         {
-            // beta's rainforest needs temperature >= 0.97 and humidity * temperature >= 0.9; use its hottest, wettest
+            // rainforest needs temperature >= 0.97 and humidity * temperature >= 0.9; use its hottest, wettest
             temperature = Enumerable.Repeat(1.0, gridX * gridZ).ToArray();
             humidity = Enumerable.Repeat(1.0, gridX * gridZ).ToArray();
             return;
         }
 
         long seed = settings.Seed;
-        var temperatureNoise = new BetaOctaveSimplexNoise(new Random(SeedFrom(seed * 9871)), 4);
-        var humidityNoise = new BetaOctaveSimplexNoise(new Random(SeedFrom(seed * 39811)), 4);
-        var detailNoise = new BetaOctaveSimplexNoise(new Random(SeedFrom(seed * 543321)), 2);
-        // beta samples climate per block; grid columns are CellWidth blocks apart, so the scale is stretched
+        var temperatureNoise = new Noise3DOctaveSimplexNoise(new Random(SeedFrom(seed * 9871)), 4);
+        var humidityNoise = new Noise3DOctaveSimplexNoise(new Random(SeedFrom(seed * 39811)), 4);
+        var detailNoise = new Noise3DOctaveSimplexNoise(new Random(SeedFrom(seed * 543321)), 2);
+        // 3D Noise samples climate per block; grid columns are CellWidth blocks apart, so the scale is stretched
         temperature = temperatureNoise.Generate(0, 0, gridX, gridZ, 0.025 * CellWidth, 0.025 * CellWidth, 0.25);
         humidity = humidityNoise.Generate(0, 0, gridX, gridZ, 0.05 * CellWidth, 0.05 * CellWidth, 1 / 3.0);
         var detail = detailNoise.Generate(0, 0, gridX, gridZ, 0.25 * CellWidth, 0.25 * CellWidth, 1 / 1.7);
@@ -119,22 +119,22 @@ public sealed class Noise3DTerrainGenerator
         }
     }
 
-    // beta's density on the coarse grid, indexed (x * gridZ + z) * GridHeight + y; progress is 0..1
+    // 3D Noise density on the coarse grid, indexed (x * gridZ + z) * GridHeight + y; progress is 0..1
     public void ComputeDensity(Action<float>? progress = null)
     {
         if (temperature == null || humidity == null)
             throw new InvalidOperationException("ComputeClimate must run first");
 
         var random = new Random(settings.Seed);
-        var minLimitNoise = new BetaOctaveNoise(random, 16);
-        var maxLimitNoise = new BetaOctaveNoise(random, 16);
-        var mainNoise = new BetaOctaveNoise(random, 8);
-        // beta creates two more noises here (sand/gravel and stone depth); they are only used for surface blocks,
+        var minLimitNoise = new Noise3DOctaveNoise(random, 16);
+        var maxLimitNoise = new Noise3DOctaveNoise(random, 16);
+        var mainNoise = new Noise3DOctaveNoise(random, 8);
+        // the original creates two more noises here (sand/gravel and stone depth); they are only used for surface blocks,
         // but still consume random numbers
-        _ = new BetaOctaveNoise(random, 4);
-        _ = new BetaOctaveNoise(random, 4);
-        var scaleNoise = new BetaOctaveNoise(random, 10);
-        var depthNoise = new BetaOctaveNoise(random, 16);
+        _ = new Noise3DOctaveNoise(random, 4);
+        _ = new Noise3DOctaveNoise(random, 4);
+        var scaleNoise = new Noise3DOctaveNoise(random, 10);
+        var depthNoise = new Noise3DOctaveNoise(random, 16);
 
         var horizontal = settings.CoordinateScale;
         var vertical = settings.HeightScale;
@@ -267,7 +267,7 @@ public sealed class Noise3DTerrainGenerator
         return value < 0 ? 0 : value > 1 ? 1 : value;
     }
 
-    // System.Random takes an int seed; fold the 64-bit beta-style seed into one
+    // System.Random takes an int seed; fold the 64-bit seed into one
     private static int SeedFrom(long seed)
     {
         return unchecked((int)(seed ^ (seed >> 32)));

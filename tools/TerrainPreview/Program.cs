@@ -6,7 +6,7 @@ using Timberborn.TerrainGenerator.TerrainTools;
 using TerrainPreview;
 
 // Usage:
-//   TerrainPreview noise3d --size 128x128x23 --seed 1 [--climate rainforest|betabiomes] [--base 56] [--vscale 3]
+//   TerrainPreview noise3d --size 128x128x23 --seed 1 [--climate rainforest|varyingbiomes] [--base 56] [--vscale 3]
 //       [--hscale 3] --out preview.png
 //   TerrainPreview wfc --sources a.timber,b.timber --size 64x64x23 --seed 1 [--n 3] [--symmetry true]
 //       [--periodic false] [--penalty 0.5] [--threshold 0.25] [--coverage 0.95] [--block 4] [--seeds 1-10] --out preview.png

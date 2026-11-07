@@ -1,8 +1,8 @@
 namespace Timberborn.TerrainGenerator.Generators.Noise3D;
 
-// Port of Minecraft beta 1.7.3's 2D simplex noise (NoiseGenerator2) and its octave stack (NoiseGeneratorOctaves2),
-// which beta uses for the biome climate (temperature and humidity).
-internal sealed class BetaSimplexNoise
+// 2D simplex noise and its octave stack for the 3D Noise generator (based on Minecraft beta 1.7.3's NoiseGenerator2 and
+// NoiseGeneratorOctaves2), used for the biome climate (temperature and humidity).
+internal sealed class Noise3DSimplexNoise
 {
     private static readonly int[,] Gradients =
     {
@@ -17,11 +17,11 @@ internal sealed class BetaSimplexNoise
     private readonly double xOffset;
     private readonly double yOffset;
 
-    public BetaSimplexNoise(Random random)
+    public Noise3DSimplexNoise(Random random)
     {
         xOffset = random.NextDouble() * 256;
         yOffset = random.NextDouble() * 256;
-        // beta draws a third offset it never uses; kept so the random sequence matches the original's structure
+        // 3D Noise draws a third offset it never uses; kept so the random sequence matches the original's structure
         random.NextDouble();
         for (var i = 0; i < 256; i++)
             permutations[i] = i;
@@ -92,18 +92,18 @@ internal sealed class BetaSimplexNoise
     }
 }
 
-internal sealed class BetaOctaveSimplexNoise
+internal sealed class Noise3DOctaveSimplexNoise
 {
-    private readonly BetaSimplexNoise[] octaves;
+    private readonly Noise3DSimplexNoise[] octaves;
 
-    public BetaOctaveSimplexNoise(Random random, int octaveCount)
+    public Noise3DOctaveSimplexNoise(Random random, int octaveCount)
     {
-        octaves = new BetaSimplexNoise[octaveCount];
+        octaves = new Noise3DSimplexNoise[octaveCount];
         for (var i = 0; i < octaveCount; i++)
-            octaves[i] = new BetaSimplexNoise(random);
+            octaves[i] = new Noise3DSimplexNoise(random);
     }
 
-    // like beta: each octave multiplies the frequency by frequencyFactor and doubles the amplitude
+    // each octave multiplies the frequency by frequencyFactor and doubles the amplitude
     public double[] Generate(double x, double z, int sizeX, int sizeZ, double scaleX, double scaleZ,
         double frequencyFactor)
     {

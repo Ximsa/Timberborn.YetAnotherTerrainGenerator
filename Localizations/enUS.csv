@@ -33,13 +33,13 @@ Ximsa.TerrainGenerator.Tool.Smoothing.Description,"Smooths the top surface of th
 Ximsa.TerrainGenerator.Progress.Starting,"Starting",-
 Ximsa.TerrainGenerator.Progress.Cancelled,"Cancelled - terrain unchanged",-
 Ximsa.TerrainGenerator.Tool.Noise3D,"3D Noise Generator",-
-Ximsa.TerrainGenerator.Tool.Noise3D.Description,"Generates terrain like the rainforest of Minecraft beta 1.7.3 with overhangs and floating islands.",-
+Ximsa.TerrainGenerator.Tool.Noise3D.Description,"Generates rainforest terrain from 3D noise, with overhangs and floating islands.",-
 Ximsa.TerrainGenerator.Noise3D.Seed,"Seed",-
 Ximsa.TerrainGenerator.Noise3D.RandomSeed,"Random seed",-
-Ximsa.TerrainGenerator.Noise3D.BaseLevel,"Base level (beta height at the map bottom)",-
-Ximsa.TerrainGenerator.Noise3D.VerticalScale,"Beta blocks per tile (height)",-
-Ximsa.TerrainGenerator.Noise3D.HorizontalScale,"Beta blocks per tile (across)",-
-Ximsa.TerrainGenerator.Noise3D.BetaBiomes,"Varying beta biomes instead of rainforest",-
+Ximsa.TerrainGenerator.Noise3D.BaseLevel,"Base level (3D Noise height at the map bottom)",-
+Ximsa.TerrainGenerator.Noise3D.VerticalScale,"3D Noise blocks per tile (height)",-
+Ximsa.TerrainGenerator.Noise3D.HorizontalScale,"3D Noise blocks per tile (across)",-
+Ximsa.TerrainGenerator.Noise3D.VaryingBiomes,"Varying 3D Noise biomes instead of rainforest",-
 Ximsa.TerrainGenerator.Progress.Climate,"Computing climate",-
 Ximsa.TerrainGenerator.Progress.Noise,"Computing 3D noise",-
 Ximsa.TerrainGenerator.Progress.Shaping,"Shaping terrain",-
