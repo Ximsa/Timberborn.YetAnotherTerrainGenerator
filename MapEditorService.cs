@@ -77,10 +77,19 @@ public class MapEditorService
         mapEditorSceneLoader.LoadMap(MapFileReference.FromUserFolder("generated"));
     }
 
-    public void Set2DTerrain(NDArray heightmap)
+    // applies one map row per step and yields the fraction of rows done, so callers can spread it over frames
+    public IEnumerable<float> Set2DTerrainByRow(NDArray heightmap)
     {
         heightmap = heightmap.astype(np.int32);
         for (var i = 0; i < MapSize.y; i++)
+        {
+            Set2DTerrainRow(heightmap, i);
+            yield return (i + 1f) / MapSize.y;
+        }
+    }
+
+    private void Set2DTerrainRow(NDArray heightmap, int i)
+    {
         for (var j = 0; j < MapSize.x; j++)
         {
             var height = terrainService.GetAllHeightsInCell(new Vector2Int(j, i)).Select(x => x.z).DefaultIfEmpty(0).Max();

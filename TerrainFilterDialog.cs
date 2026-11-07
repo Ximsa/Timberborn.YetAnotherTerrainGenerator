@@ -5,23 +5,22 @@ using UnityEngine.UIElements;
 
 namespace Timberborn.TerrainGenerator;
 
-public class TerrainFilterDialog : DialogBoxElement
+public class TerrainFilterDialog : TerrainJobDialog
 {
     private const string FilterTitleKey = "Ximsa.TerrainGenerator.FilterTitle";
     private const string PassesKey = "Ximsa.TerrainGenerator.Passes";
     private const string RadiusKey = "Ximsa.TerrainGenerator.Radius";
     private const string ApplyKey = "Ximsa.TerrainGenerator.Apply";
 
-    private readonly MapEditorService mapEditorService;
+    private readonly VisualElement applyButton;
 
     private int passes = 1;
     private int radius = 4;
 
     public TerrainFilterDialog(
         ILoc loc,
-        MapEditorService mapEditorService)
+        MapEditorService mapEditorService) : base(loc, mapEditorService)
     {
-        this.mapEditorService = mapEditorService;
         SetTitle(loc.T(FilterTitleKey));
         Content.Add(new GameSliderInt()
             .SetLabel($"{loc.T(PassesKey)}")
@@ -33,19 +32,24 @@ public class TerrainFilterDialog : DialogBoxElement
             .SetHorizontalSlider(new SliderValues<int>(1, 12, radius))
             .RegisterChange(radius => this.radius = radius)
             .AddEndLabel(value => $"{value}"));
-        Content.AddButton(loc.T(ApplyKey), ApplyKey, OnApply);
+        applyButton = Content.AddButton(loc.T(ApplyKey), ApplyKey, OnApply);
+        AddProgressBar();
         AddCloseButton();
     }
 
     private void OnApply()
     {
-        mapEditorService.RemoveAllEntityComponents();
-        var terrain = mapEditorService.GetTerrain().astype(np.float32).sum(0);
-        var originalMax = terrain.max();
-        var originalMin = terrain.min();
-        terrain = terrain.MedianBlur(radius, passes);
-        terrain -= terrain.min() + originalMin;
-        terrain = terrain / terrain.max() * originalMax;
-        mapEditorService.Set2DTerrain(terrain);
+        var passes = this.passes;
+        var radius = this.radius;
+        RunJob(applyButton, (terrain, _, progress) =>
+        {
+            terrain = terrain.astype(np.float32).sum(0);
+            var originalMax = terrain.max();
+            var originalMin = terrain.min();
+            terrain = progress.Stage(FilteringKey, 0, 1, report => terrain.MedianBlur(radius, passes, report));
+            terrain -= terrain.min() + originalMin;
+            terrain = terrain / terrain.max() * originalMax;
+            return terrain;
+        });
     }
 }

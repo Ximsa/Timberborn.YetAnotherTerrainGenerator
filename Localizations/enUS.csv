@@ -5,9 +5,10 @@ Ximsa.TerrainGenerator.Noise,"Add noise",-
 Ximsa.TerrainGenerator.NoiseStd,"Noise Multiplier",-
 Ximsa.TerrainGenerator.NoiseMean,"Mean",-
 Ximsa.TerrainGenerator.FilterTitle,"Filter Tool",-
+Ximsa.TerrainGenerator.UseGaussFilterToggle,"Use Gaussian Filter instead of Median Filter",-
 Ximsa.TerrainGenerator.Generate,"Generate Terrain",-
-Ximsa.TerrainGenerator.MedianBlurPasses,"Number of Median Filter Passes",-
-Ximsa.TerrainGenerator.MedianBlurRadius,"Radius of the Median Filter",-
+Ximsa.TerrainGenerator.Passes,"Number of Filter Passes",-
+Ximsa.TerrainGenerator.Radius,"Radius of the Filter",-
 Ximsa.TerrainGenerator.MedianBlurTitle,"Global Median Blur",-
 Ximsa.TerrainGenerator.Apply,"Apply",-
 Ximsa.TerrainGenerator.ZoomFactor,"Zoom Factor",-
@@ -16,3 +17,11 @@ Ximsa.TerrainGenerator.MaxHeight,"Maximum Terrain Height",-
 Ximsa.TerrainGenerator.SharpenTitle,"Sharpening Tool",-
 Ximsa.TerrainGenerator.SharpenStrength,"Sharpening Strength",-
 Ximsa.TerrainGenerator.SharpenSize,"Sharpening Kernel Range",-
+Ximsa.TerrainGenerator.Progress.LoadingModels,"Loading models",-
+Ximsa.TerrainGenerator.Progress.Encoding,"Encoding terrain",-
+Ximsa.TerrainGenerator.Progress.Decoding,"Decoding terrain",-
+Ximsa.TerrainGenerator.Progress.Scaling,"Scaling terrain",-
+Ximsa.TerrainGenerator.Progress.Filtering,"Smoothing terrain",-
+Ximsa.TerrainGenerator.Progress.Applying,"Applying terrain",-
+Ximsa.TerrainGenerator.Progress.Done,"Done",-
+Ximsa.TerrainGenerator.Progress.Failed,"Failed",-

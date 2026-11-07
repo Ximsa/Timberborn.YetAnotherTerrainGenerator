@@ -8,7 +8,7 @@ using Random = System.Random;
 
 namespace Timberborn.TerrainGenerator;
 
-public class TerrainGeneratorDialog : DialogBoxElement
+public class TerrainGeneratorDialog : TerrainJobDialog
 {
     private const string TitleKey = "Ximsa.TerrainGenerator.Title";
     private const string EncoderKey = "Ximsa.TerrainGenerator.Encoder";
@@ -22,137 +22,137 @@ public class TerrainGeneratorDialog : DialogBoxElement
     private const string ZoomFactorKey = "Ximsa.TerrainGenerator.ZoomFactor";
     private const string MaxHeightKey = "Ximsa.TerrainGenerator.MaxHeight";
 
-    private readonly MapEditorService mapEditorService;
-
-    private float encoderBias = -1;
-    private int maxTerrainHeight;
-    private int medianBlurPasses = 1;
-    private int medianBlurRadius = 4;
-    private float noiseMean;
-    private float noiseStd = 1;
-    private float zoomFactor = 1.25f;
-
+    private readonly VisualElement generateButton;
+    private Settings settings = new();
 
     public TerrainGeneratorDialog(
         ILoc loc,
-        MapEditorService mapEditorService)
+        MapEditorService mapEditorService) : base(loc, mapEditorService)
     {
-        this.mapEditorService = mapEditorService;
         SetTitle(loc.T(TitleKey));
         Content.Add(new GameSlider()
             .SetLabel($"{loc.T(EncoderKey)}")
-            .SetHorizontalSlider(new SliderValues<float>(-12, 12, encoderBias))
-            .RegisterChange(encoderBias => this.encoderBias = encoderBias)
+            .SetHorizontalSlider(new SliderValues<float>(-12, 12, settings.EncoderBias))
+            .RegisterChange(encoderBias => settings.EncoderBias = encoderBias)
             .AddEndLabel(value => $"{value:G3}"));
         Content.AddLabel(loc.T(NoiseKey), NoiseKey);
         Content.Add(new GameSlider()
             .SetLabel($"{loc.T(NoiseMeanKey)}")
-            .SetHorizontalSlider(new SliderValues<float>(-12, 12, noiseMean))
-            .RegisterChange(noiseMean => this.noiseMean = noiseMean)
+            .SetHorizontalSlider(new SliderValues<float>(-12, 12, settings.NoiseMean))
+            .RegisterChange(noiseMean => settings.NoiseMean = noiseMean)
             .AddEndLabel(value => $"{value:G3}"));
         Content.Add(new GameSlider()
             .SetLabel($"{loc.T(NoiseStdKey)}")
-            .SetHorizontalSlider(new SliderValues<float>(0, 12, noiseStd))
-            .RegisterChange(noiseStd => this.noiseStd = noiseStd)
+            .SetHorizontalSlider(new SliderValues<float>(0, 12, settings.NoiseStd))
+            .RegisterChange(noiseStd => settings.NoiseStd = noiseStd)
             .AddEndLabel(value => $"{value:G3}"));
         Content.AddLabel(loc.T(MedianBlurTitleKey), MedianBlurTitleKey);
         Content.Add(new GameSliderInt()
             .SetLabel($"{loc.T(MedianBlurPassesKey)}")
-            .SetHorizontalSlider(new SliderValues<int>(0, 8, medianBlurPasses))
-            .RegisterChange(medianBlurPasses => this.medianBlurPasses = medianBlurPasses)
+            .SetHorizontalSlider(new SliderValues<int>(0, 8, settings.MedianBlurPasses))
+            .RegisterChange(medianBlurPasses => settings.MedianBlurPasses = medianBlurPasses)
             .AddEndLabel(value => $"{value}"));
         Content.Add(new GameSliderInt()
             .SetLabel($"{loc.T(MedianBlurRadiusKey)}")
-            .SetHorizontalSlider(new SliderValues<int>(1, 8, medianBlurRadius))
-            .RegisterChange(medianBlurRadius => this.medianBlurRadius = medianBlurRadius)
+            .SetHorizontalSlider(new SliderValues<int>(1, 8, settings.MedianBlurRadius))
+            .RegisterChange(medianBlurRadius => settings.MedianBlurRadius = medianBlurRadius)
             .AddEndLabel(value => $"{value}"));
         Content.Add(new GameSlider()
             .SetLabel($"{loc.T(ZoomFactorKey)}")
-            .SetHorizontalSlider(new SliderValues<float>(1, 8, zoomFactor))
-            .RegisterChange(zoomFactor => this.zoomFactor = zoomFactor)
+            .SetHorizontalSlider(new SliderValues<float>(1, 8, settings.ZoomFactor))
+            .RegisterChange(zoomFactor => settings.ZoomFactor = zoomFactor)
             .AddEndLabel(value => $"{value:G3}"));
-        maxTerrainHeight = mapEditorService.MapSize.z;
+        settings.MaxTerrainHeight = mapEditorService.MapSize.z;
         Content.Add(new GameSliderInt()
             .SetLabel($"{loc.T(MaxHeightKey)}")
             .SetHorizontalSlider(new SliderValues<int>(1, mapEditorService.MapSize.z, mapEditorService.MapSize.z))
-            .RegisterChange(maxHeight => maxTerrainHeight = maxHeight)
+            .RegisterChange(maxHeight => settings.MaxTerrainHeight = maxHeight)
             .AddEndLabel(value => $"{value}"));
-        Content.AddButton(loc.T(GenerateKey), GenerateKey, OnGenerate);
+        generateButton = Content.AddButton(loc.T(GenerateKey), GenerateKey, OnGenerate);
+        AddProgressBar();
         AddCloseButton();
     }
 
     private void OnGenerate()
     {
-        mapEditorService.RemoveAllEntityComponents();
-        var terrain = Pipeline2D();
-        mapEditorService.Set2DTerrain(terrain);
+        // snapshot, so moving sliders while the job runs does not affect it
+        var jobSettings = settings.Clone();
+        RunJob(generateButton, (terrain, mapSize, progress) => Pipeline2D(terrain, mapSize, jobSettings, progress));
     }
 
-    // encode current map, add noise, decode map
-    private NDArray Pipeline2D()
+    // encode current map, add noise, decode map; runs on a background thread
+    private static NDArray Pipeline2D(NDArray terrain, Vector3Int mapSize, Settings settings,
+        ProgressReporter progress)
     {
         // load models
-        var encoder = LoadModel("Encoder2D.npz");
-        var decoder = LoadModel("Decoder2D.npz");
+        var (encoder, decoder) = progress.Stage(LoadingModelsKey, 0f, 0.05f,
+            _ => (LoadModel("Encoder2D.npz"), LoadModel("Decoder2D.npz")));
 
         var inputDim = (int)Math.Sqrt(encoder.weight1.Shape[1]);
         var encodedSize = decoder.weight1.Shape[1];
 
-        // normalize input
-        var terrain = mapEditorService.GetTerrain();
-        terrain = terrain.astype(np.float32);
-        terrain = terrain.sum(0);
-        terrain = terrain.Scale2D(new Shape(inputDim, inputDim));
-        terrain /= np.max(terrain);
-        Debug.Log(terrain.Shape);
-        // encode
-        Debug.Log("encode");
-        var encoded = RunModel(terrain.reshape(1, inputDim * inputDim), encoder);
+        var encoded = progress.Stage(EncodingKey, 0.05f, 0.1f, report =>
+        {
+            // normalize input
+            terrain = terrain.astype(np.float32);
+            terrain = terrain.sum(0);
+            terrain = terrain.Scale2D(new Shape(inputDim, inputDim), report);
+            terrain /= np.max(terrain);
+            Debug.Log(terrain.Shape);
+            // encode
+            return RunModel(terrain.reshape(1, inputDim * inputDim), encoder);
+        });
 
-        // generate noise
-        Debug.Log("noise");
-        var noise = ((np.random.rand(1, encodedSize) - 0.5) * noiseStd + noiseMean).astype(np.float32);
-        encoded = encoded * encoderBias + noise;
+        var decoded = progress.Stage(DecodingKey, 0.1f, 0.15f, _ =>
+        {
+            // generate noise
+            var noise = ((np.random.rand(1, encodedSize) - 0.5) * settings.NoiseStd + settings.NoiseMean)
+                .astype(np.float32);
+            encoded = encoded * settings.EncoderBias + noise;
 
-        // decode
-        Debug.Log("decode");
-        var decoded = RunModel(encoded, decoder);
-        Debug.Log($"Min {decoded.min()} Max {decoded.max()} Mean {decoded.mean()} Std {decoded.std()}");
+            // decode
+            var result = RunModel(encoded, decoder);
+            Debug.Log($"Min {result.min()} Max {result.max()} Mean {result.mean()} Std {result.std()}");
+            return result;
+        });
 
         // soft "clamp"
         //decoded = np.tanh(decoded, NPTypeCode.Float) + 0.25f * decoded;
         decoded = decoded.reshape(inputDim, inputDim);
 
-        Debug.Log("zoom");
-        if (decoded.Shape[0] < mapEditorService.MapSize.y || decoded.Shape[1] < mapEditorService.MapSize.x)
+        decoded = progress.Stage(ScalingKey, 0.15f, 0.45f, report =>
         {
-            var targetSize = math.max(mapEditorService.MapSize.x, mapEditorService.MapSize.y);
-            decoded = decoded.Scale2D(new Shape(targetSize, targetSize));
-        }
+            // zoom
+            if (decoded.Shape[0] < mapSize.y || decoded.Shape[1] < mapSize.x)
+            {
+                var targetSize = math.max(mapSize.x, mapSize.y);
+                decoded = decoded.Scale2D(new Shape(targetSize, targetSize), fraction => report(fraction / 2));
+            }
 
-        decoded = decoded.Scale2D(
-            new Shape((int)(decoded.Shape[0] * zoomFactor), (int)(decoded.Shape[1] * zoomFactor)));
+            decoded = decoded.Scale2D(
+                new Shape((int)(decoded.Shape[0] * settings.ZoomFactor), (int)(decoded.Shape[1] * settings.ZoomFactor)),
+                fraction => report(0.5f + fraction / 2));
 
-        // trim
-        Debug.Log("trim");
-        var rand = new Random();
-        var maxDim0 = decoded.Shape[0] - mapEditorService.MapSize.y;
-        var maxDim1 = decoded.Shape[1] - mapEditorService.MapSize.x;
-        var offsetDim0 = rand.Next(0, maxDim0 + 1);
-        var offsetDim1 = rand.Next(0, maxDim1 + 1);
-        decoded = decoded[
-            $"{offsetDim0}:{mapEditorService.MapSize.y + offsetDim0},{offsetDim1}:{mapEditorService.MapSize.x + offsetDim1}"];
+            // trim
+            var rand = new Random();
+            var maxDim0 = decoded.Shape[0] - mapSize.y;
+            var maxDim1 = decoded.Shape[1] - mapSize.x;
+            var offsetDim0 = rand.Next(0, maxDim0 + 1);
+            var offsetDim1 = rand.Next(0, maxDim1 + 1);
+            return decoded[
+                $"{offsetDim0}:{mapSize.y + offsetDim0},{offsetDim1}:{mapSize.x + offsetDim1}"];
+        });
 
-        // filter
-        Debug.Log($"filter {medianBlurRadius} {medianBlurPasses}");
-        decoded = decoded.MedianBlur(medianBlurRadius, medianBlurPasses);
+        return progress.Stage(FilteringKey, 0.45f, 1f, report =>
+        {
+            // filter
+            Debug.Log($"filter {settings.MedianBlurRadius} {settings.MedianBlurPasses}");
+            decoded = decoded.MedianBlur(settings.MedianBlurRadius, settings.MedianBlurPasses, report);
 
-        // normalize
-        decoded -= decoded.min();
-        decoded = decoded / decoded.max() * (maxTerrainHeight - 1.0f);
-
-        // set terrain
-        return decoded;
+            // normalize
+            decoded -= decoded.min();
+            return decoded / decoded.max() * (settings.MaxTerrainHeight - 1.0f);
+        });
     }
 
     private static (NDArray weight1, NDArray bias1, NDArray weight2, NDArray bias2, NDArray weight3, NDArray bias3)
@@ -190,5 +190,21 @@ public class TerrainGeneratorDialog : DialogBoxElement
         var layer3 = np.matmul(layer2, weight3.T);
         layer3 += bias3;
         return layer3;
+    }
+
+    private sealed class Settings
+    {
+        public float EncoderBias = -1;
+        public int MaxTerrainHeight;
+        public int MedianBlurPasses = 1;
+        public int MedianBlurRadius = 4;
+        public float NoiseMean;
+        public float NoiseStd = 1;
+        public float ZoomFactor = 1.25f;
+
+        public Settings Clone()
+        {
+            return (Settings)MemberwiseClone();
+        }
     }
 }
