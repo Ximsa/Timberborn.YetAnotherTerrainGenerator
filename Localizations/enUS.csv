@@ -25,3 +25,6 @@ Ximsa.TerrainGenerator.Progress.Filtering,"Smoothing terrain",-
 Ximsa.TerrainGenerator.Progress.Applying,"Applying terrain",-
 Ximsa.TerrainGenerator.Progress.Done,"Done",-
 Ximsa.TerrainGenerator.Progress.Failed,"Failed",-
+Ximsa.TerrainGenerator.Group.Generators,"Terrain Generators",-
+Ximsa.TerrainGenerator.Tool.Autoencoder,"Autoencoder Generator",-
+Ximsa.TerrainGenerator.Tool.Phase0Checks,"Phase 0 checks (temporary)",-

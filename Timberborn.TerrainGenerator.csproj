@@ -18,6 +18,7 @@
         <Reference Include="$(TimberbornManagedDir)\U*.dll" Private="false"/>
         <Reference Include="$(TimberbornManagedDir)\B*.dll" Private="false"/>
         <Reference Include="$(TimberbornManagedDir)\System.Collections.Immutable.dll" Private="false"/>
+        <Reference Include="$(TimberbornManagedDir)\Newtonsoft.Json.dll" Private="false"/>
     </ItemGroup>
 
     <ItemGroup>

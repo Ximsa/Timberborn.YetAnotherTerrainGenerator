@@ -30,5 +30,10 @@ public class MapEditorConfigurator : Configurator
         Bind<MapEditorService>().AsSingleton();
         MultiBind<BottomBarModule>().ToProvider<BottomBarModuleProvider<TerrainGeneratorButton>>().AsSingleton();
         MultiBind<BottomBarModule>().ToProvider<BottomBarModuleProvider<TerrainFilterButton>>().AsSingleton();
+
+        Bind<AutoencoderGeneratorTool>().AsSingleton();
+        Bind<Phase0ChecksTool>().AsSingleton();
+        Bind<TerrainGeneratorGroupButton>().AsSingleton();
+        MultiBind<BottomBarModule>().ToProvider<BottomBarModuleProvider<TerrainGeneratorGroupButton>>().AsSingleton();
     }
 }

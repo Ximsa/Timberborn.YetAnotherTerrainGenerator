@@ -1,0 +1,7 @@
+{
+  "ToolGroupSpec": {
+    "Id": "TerrainGenerators",
+    "DisplayNameLocKey": "Ximsa.TerrainGenerator.Group.Generators",
+    "Icon": "Sprites/terrain-generator-button"
+  }
+}
