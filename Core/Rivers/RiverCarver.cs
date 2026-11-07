@@ -65,6 +65,10 @@ public sealed class RiverCarver
 
     public List<RiverHead> Heads { get; } = new();
 
+    // per river: its head and then every tile downstream outside tunnels, where the water source can go if the head
+    // turns out unsuitable (the game decides whether a source fits)
+    public List<IReadOnlyList<RiverHead>> SourceSpots { get; } = new();
+
     // tiles covered by river beds, filled basins and tunnels, indexed y * sizeX + x
     public bool[] Water { get; private set; } = Array.Empty<bool>();
 
@@ -79,6 +83,7 @@ public sealed class RiverCarver
         var result = (int[])heights.Clone();
         Water = new bool[heights.Length];
         tunnels.Clear();
+        var openCourses = new List<(List<int> Course, HashSet<int> Tunnelled)>();
         // tiles on an earlier river's course; a later river that reaches one joins it
         var courses = new bool[heights.Length];
         var climbSurface = Smooth(heights);
@@ -91,9 +96,14 @@ public sealed class RiverCarver
             foreach (var tile in basins) Water[tile] = true;
             foreach (var tile in course) courses[tile] = true;
             Heads.Add(new RiverHead(head % sizeX, head / sizeX, result[head]));
+            openCourses.Add((course, tunnelled));
             progress?.Invoke((river + 1f) / settings.Rivers);
         }
 
+        // the spots where each river's water source may go, on the final surface
+        foreach (var (course, tunnelled) in openCourses)
+            SourceSpots.Add(course.Where(tile => !tunnelled.Contains(tile))
+                .Select(tile => new RiverHead(tile % sizeX, tile / sizeX, result[tile])).ToList());
         return result;
     }
 

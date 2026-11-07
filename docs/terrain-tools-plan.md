@@ -123,7 +123,8 @@ The terrain tools work on a heightmap, but must not destroy 3D terrain:
   to mouth where the 1-block limit allows, across the width setting. Filled basins are not dug, the water fills them
   as Timberborn water does. Tunnels are the exception: a passage of 2 voxels at bed height is cleared under the
   ground (keeping at least one block of roof); where the ground is too thin for a roof it is cut open to the bed.
-- Place a water source at the head.
+- Place a water source at the head; where the game does not accept it there (terrain or objects in its footprint, no
+  ground below, e.g. on a slope near the peak), at the first tile downstream (outside tunnels) where it fits.
 - Settings: number of rivers, width, head distance (0..16, default 4), largest basin to fill (20..1000 tiles, default
   500), water source strength. One progress stage.
 - Offline preview: `TerrainPreview rivers <file.timber> [--head 4] [--basin 500]`, or `--rivers N` after any

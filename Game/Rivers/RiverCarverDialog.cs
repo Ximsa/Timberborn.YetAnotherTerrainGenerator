@@ -3,6 +3,7 @@ using Timberborn.TerrainGenerator.Core.Common;
 using Timberborn.TerrainGenerator.Core.Rivers;
 using Timberborn.TerrainGenerator.Game.Common;
 using TimberUi.CommonUi;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace Timberborn.TerrainGenerator.Game.Rivers;
@@ -62,25 +63,32 @@ public class RiverCarverDialog : TerrainJobDialog
         // snapshot, so changing settings while the job runs does not affect it; every run gets a new seed
         var jobSettings = settings.Clone();
         jobSettings.Seed = unchecked((int)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-        IReadOnlyList<RiverHead> heads = Array.Empty<RiverHead>();
+        IReadOnlyList<IReadOnlyList<RiverHead>> sourceSpots = Array.Empty<IReadOnlyList<RiverHead>>();
         RunJob(applyButton, (terrain, mapSize, progress) =>
         {
             var voxels = VoxelMap.FromTerrain(terrain);
             var carver = new RiverCarver(jobSettings, mapSize.x, mapSize.y);
             var heights = progress.Stage(CarvingKey, 0, 1, report => carver.Carve(Surface.Heights(voxels), report));
-            heads = carver.Heads;
+            sourceSpots = carver.SourceSpots;
             var carved = Surface.WithHeights(voxels, heights);
             carver.CarveTunnels(carved);
             return carved;
-        }, removeAllEntities: false, placeEntities: () => PlaceWaterSources(heads, jobSettings.SourceStrength));
+        }, removeAllEntities: false, placeEntities: () => PlaceWaterSources(sourceSpots, jobSettings.SourceStrength));
     }
 
-    private IEnumerable<float> PlaceWaterSources(IReadOnlyList<RiverHead> heads, float strength)
+    // one water source per river, at its head or, where the game does not accept it there, as close downstream as
+    // possible
+    private IEnumerable<float> PlaceWaterSources(IReadOnlyList<IReadOnlyList<RiverHead>> sourceSpots, float strength)
     {
-        for (var i = 0; i < heads.Count; i++)
+        for (var i = 0; i < sourceSpots.Count; i++)
         {
-            entityPlacer.PlaceWaterSource(heads[i], strength);
-            yield return (i + 1f) / heads.Count;
+            var placed = entityPlacer.PlaceWaterSource(sourceSpots[i], strength);
+            if (placed == null)
+                Debug.LogWarning($"[TerrainGenerator] no place for river {i + 1}'s water source along its course");
+            else if (placed != sourceSpots[i][0])
+                Debug.Log($"[TerrainGenerator] river {i + 1}'s water source moved from its head {sourceSpots[i][0]} " +
+                          $"to {placed}");
+            yield return (i + 1f) / sourceSpots.Count;
         }
     }
 }

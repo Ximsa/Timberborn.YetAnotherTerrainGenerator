@@ -24,15 +24,18 @@ public class EntityPlacer
     private const float GatherablePercent = 0.5f;
 
     private readonly BlockObjectFactory blockObjectFactory;
+    private readonly BlockValidator blockValidator;
     private readonly MapEditorService mapEditorService;
     private readonly NaturalResourceSpawner naturalResourceSpawner;
     private readonly TemplateService templateService;
     private readonly IThreadSafeWaterMap waterMap;
 
-    public EntityPlacer(BlockObjectFactory blockObjectFactory, MapEditorService mapEditorService,
+    public EntityPlacer(BlockObjectFactory blockObjectFactory, BlockValidator blockValidator,
+        MapEditorService mapEditorService,
         NaturalResourceSpawner naturalResourceSpawner, TemplateService templateService, IThreadSafeWaterMap waterMap)
     {
         this.blockObjectFactory = blockObjectFactory;
+        this.blockValidator = blockValidator;
         this.mapEditorService = mapEditorService;
         this.naturalResourceSpawner = naturalResourceSpawner;
         this.templateService = templateService;
@@ -78,13 +81,21 @@ public class EntityPlacer
         yield return 1;
     }
 
-    // places the smallest clean water source with its corner on the head, standing on the surface
-    public void PlaceWaterSource(RiverHead head, float strength)
+    // places the smallest clean water source with its corner on the first spot where the game accepts it (no terrain
+    // or objects in its way, ground below); spots stand on the surface. Returns the spot used, or null if none fits
+    public RiverHead? PlaceWaterSource(IEnumerable<RiverHead> spots, float strength)
     {
         var template = WaterSourceTemplate();
-        var blockObject = blockObjectFactory.CreateFinished(new EntitySetup.Builder(template.Blueprint),
-            new Placement(new Vector3Int(head.X, head.Y, head.Z)));
-        blockObject.GetComponent<WaterSource>().SetSpecifiedStrength(strength);
+        foreach (var spot in spots)
+        {
+            var placement = new Placement(new Vector3Int(spot.X, spot.Y, spot.Z));
+            if (!blockValidator.BlocksValid(template, placement)) continue;
+            var blockObject = blockObjectFactory.CreateFinished(new EntitySetup.Builder(template.Blueprint), placement);
+            blockObject.GetComponent<WaterSource>().SetSpecifiedStrength(strength);
+            return spot;
+        }
+
+        return null;
     }
 
     private BlockObjectSpec WaterSourceTemplate()
