@@ -14,7 +14,7 @@ public sealed class RiverCarverSettings
 
     // basins up to this many tiles below their rim are filled and the river flows on over the rim; larger ones are
     // tunnelled through towards the nearest map edge
-    public int MaxBasinArea = 150;
+    public int MaxBasinArea = 500;
 
     // strength of the water source at each river head
     public float SourceStrength = 1.5f;

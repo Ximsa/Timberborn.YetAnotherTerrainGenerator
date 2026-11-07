@@ -125,8 +125,8 @@ The terrain tools work on a heightmap, but must not destroy 3D terrain:
   ground (keeping at least one block of roof); where the ground is too thin for a roof it is cut open to the bed.
 - Place a water source at the head.
 - Settings: number of rivers, width, head distance (0..16, default 4), largest basin to fill (20..1000 tiles, default
-  150), water source strength. One progress stage.
-- Offline preview: `TerrainPreview rivers <file.timber> [--head 4] [--basin 150]`, or `--rivers N` after any
+  500), water source strength. One progress stage.
+- Offline preview: `TerrainPreview rivers <file.timber> [--head 4] [--basin 500]`, or `--rivers N` after any
   map-producing command (e.g. `noise3d`). Water is drawn blue, tunnels purple, heads red.
 
 ### Phase 4: Tree Placement
