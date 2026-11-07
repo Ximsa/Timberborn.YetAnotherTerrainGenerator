@@ -3,6 +3,7 @@ using Timberborn.Localization;
 using TimberUi.CommonUi;
 using Unity.Mathematics;
 using UnityEngine;
+using Timberborn.TerrainGenerator.Generators.Autoencoder;
 using UnityEngine.UIElements;
 using Random = System.Random;
 
@@ -12,9 +13,7 @@ public class TerrainGeneratorDialog : TerrainJobDialog
 {
     private const string TitleKey = "Ximsa.TerrainGenerator.Title";
     private const string EncoderKey = "Ximsa.TerrainGenerator.Encoder";
-    private const string NoiseKey = "Ximsa.TerrainGenerator.Noise";
-    private const string NoiseStdKey = "Ximsa.TerrainGenerator.NoiseStd";
-    private const string NoiseMeanKey = "Ximsa.TerrainGenerator.NoiseMean";
+    private const string VarietyKey = "Ximsa.TerrainGenerator.Variety";
     private const string GenerateKey = "Ximsa.TerrainGenerator.Generate";
     private const string MedianBlurPassesKey = "Ximsa.TerrainGenerator.Passes";
     private const string MedianBlurRadiusKey = "Ximsa.TerrainGenerator.Radius";
@@ -32,20 +31,14 @@ public class TerrainGeneratorDialog : TerrainJobDialog
         SetTitle(loc.T(TitleKey));
         Content.Add(new GameSlider()
             .SetLabel($"{loc.T(EncoderKey)}")
-            .SetHorizontalSlider(new SliderValues<float>(-12, 12, settings.EncoderBias))
-            .RegisterChange(encoderBias => settings.EncoderBias = encoderBias)
-            .AddEndLabel(value => $"{value:G3}"));
-        Content.AddLabel(loc.T(NoiseKey), NoiseKey);
+            .SetHorizontalSlider(new SliderValues<float>(0, 1, settings.KeepCurrent))
+            .RegisterChange(keepCurrent => settings.KeepCurrent = keepCurrent)
+            .AddEndLabel(value => $"{value * 100:F0}%"));
         Content.Add(new GameSlider()
-            .SetLabel($"{loc.T(NoiseMeanKey)}")
-            .SetHorizontalSlider(new SliderValues<float>(-12, 12, settings.NoiseMean))
-            .RegisterChange(noiseMean => settings.NoiseMean = noiseMean)
-            .AddEndLabel(value => $"{value:G3}"));
-        Content.Add(new GameSlider()
-            .SetLabel($"{loc.T(NoiseStdKey)}")
-            .SetHorizontalSlider(new SliderValues<float>(0, 12, settings.NoiseStd))
-            .RegisterChange(noiseStd => settings.NoiseStd = noiseStd)
-            .AddEndLabel(value => $"{value:G3}"));
+            .SetLabel($"{loc.T(VarietyKey)}")
+            .SetHorizontalSlider(new SliderValues<float>(0, 3, settings.Variety))
+            .RegisterChange(variety => settings.Variety = variety)
+            .AddEndLabel(value => $"{value:F2}"));
         Content.AddLabel(loc.T(MedianBlurTitleKey), MedianBlurTitleKey);
         Content.Add(new GameSliderInt()
             .SetLabel($"{loc.T(MedianBlurPassesKey)}")
@@ -86,8 +79,9 @@ public class TerrainGeneratorDialog : TerrainJobDialog
         ProgressReporter progress)
     {
         // load models
-        var (encoder, decoder) = progress.Stage(LoadingModelsKey, 0f, 0.05f,
-            _ => (LoadModel("Encoder2D.npz"), LoadModel("Decoder2D.npz")));
+        var (encoder, decoder, latentStats) = progress.Stage(LoadingModelsKey, 0f, 0.05f,
+            _ => (LoadModel("Encoder2D.npz"), LoadModel("Decoder2D.npz"),
+                LatentStats.Load(ModStarter.OriginPath + "/Models/LatentStats.txt")));
 
         var inputDim = (int)Math.Sqrt(encoder.weight1.Shape[1]);
         var encodedSize = decoder.weight1.Shape[1];
@@ -106,10 +100,10 @@ public class TerrainGeneratorDialog : TerrainJobDialog
 
         var decoded = progress.Stage(DecodingKey, 0.1f, 0.15f, _ =>
         {
-            // generate noise
-            var noise = ((np.random.rand(1, encodedSize) - 0.5) * settings.NoiseStd + settings.NoiseMean)
-                .astype(np.float32);
-            encoded = encoded * settings.EncoderBias + noise;
+            // sample around the built-in maps' latents, blending in the current map's
+            var sampled = latentStats.Sample(encoded.flatten().ToArray<float>(), settings.KeepCurrent,
+                settings.Variety, new Random());
+            encoded = np.array(sampled).reshape(1, encodedSize);
 
             // decode
             var result = RunModel(encoded, decoder);
@@ -195,12 +189,14 @@ public class TerrainGeneratorDialog : TerrainJobDialog
 
     private sealed class Settings
     {
-        public float EncoderBias = -1;
+        // 0 ignores the current map, 1 keeps its latent and only adds variety
+        public float KeepCurrent;
         public int MaxTerrainHeight;
         public int MedianBlurPasses = 1;
         public int MedianBlurRadius = 4;
-        public float NoiseMean;
-        public float NoiseStd = 1;
+
+        // noise in standard deviations of the built-in maps' latents
+        public float Variety = 1.5f;
         public float ZoomFactor = 1.25f;
 
         public Settings Clone()
