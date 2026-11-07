@@ -48,6 +48,19 @@ public class MapEditorService
         }
     }
 
+    // removes every entity with a block in one of the columns, at any height
+    public void RemoveEntitiesInColumns(IEnumerable<(int X, int Y)> columns)
+    {
+        var entities = new HashSet<BlockObject>();
+        var sizeZ = blockService.Size.z;
+        foreach (var (x, y) in columns)
+        for (var z = 0; z < sizeZ; z++)
+            foreach (var blockObject in blockService.GetObjectsAt(new Vector3Int(x, y, z)))
+                if (blockObject.HasComponent<EntityComponent>())
+                    entities.Add(blockObject);
+        foreach (var entity in entities) entityService.Delete(entity);
+    }
+
     public NDArray GetTerrain()
     {
         var terrainSize = terrainService.Size;

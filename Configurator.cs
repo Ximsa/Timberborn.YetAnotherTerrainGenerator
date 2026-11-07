@@ -27,14 +27,14 @@ public class MapEditorConfigurator : Configurator
     {
         Bind<MapEditorService>().AsSingleton();
 
-        Bind<TerrainSmoothingTool>().AsSingleton();
-        Bind<TerrainFilterButton>().AsSingleton();
-        MultiBind<BottomBarModule>().ToProvider<BottomBarModuleProvider<TerrainFilterButton>>().AsSingleton();
-
         Bind<AutoencoderGeneratorTool>().AsSingleton();
         Bind<Noise3DGeneratorTool>().AsSingleton();
         Bind<WfcGeneratorTool>().AsSingleton();
         Bind<TerrainGeneratorGroupButton>().AsSingleton();
         MultiBind<BottomBarModule>().ToProvider<BottomBarModuleProvider<TerrainGeneratorGroupButton>>().AsSingleton();
+
+        Bind<TerrainSmoothingTool>().AsSingleton();
+        Bind<TerrainToolsGroupButton>().AsSingleton();
+        MultiBind<BottomBarModule>().ToProvider<BottomBarModuleProvider<TerrainToolsGroupButton>>().AsSingleton();
     }
 }

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using NumSharp;
+using Timberborn.TerrainGenerator.TerrainTools;
 using Timberborn.Localization;
 using TimberUi.CommonUi;
 using UnityEngine;
@@ -57,9 +58,10 @@ public abstract class TerrainJobDialog : DialogBoxElement
     }
 
     // compute receives the current terrain voxels (shaped z, y, x) and the map size, runs on a background thread
-    // and returns the complete new terrain of the map
+    // and returns the complete new terrain of the map. Generators remove all entities; terrain tools pass
+    // removeAllEntities: false to only remove entities in columns whose terrain changed.
     protected async void RunJob(VisualElement startButton,
-        Func<NDArray, Vector3Int, ProgressReporter, VoxelMap> compute)
+        Func<NDArray, Vector3Int, ProgressReporter, VoxelMap> compute, bool removeAllEntities = true)
     {
         startButton.SetEnabled(false);
         progressContainer.SetDisplay(true);
@@ -76,13 +78,22 @@ public abstract class TerrainJobDialog : DialogBoxElement
             var terrain = mapEditorService.GetTerrain().Clone();
             var mapSize = mapEditorService.MapSize;
             var jobProgress = progress;
-            var voxels = await Task.Run(() => compute(terrain, mapSize, jobProgress), cancellation.Token);
+            var (voxels, changedColumns) = await Task.Run(() =>
+            {
+                var result = compute(terrain, mapSize, jobProgress);
+                return (result, removeAllEntities
+                    ? null
+                    : Surface.ChangedColumns(VoxelMap.FromTerrain(terrain), result));
+            }, cancellation.Token);
 
             // applying cannot be cancelled, so it gets a reporter without the cancellation token
             applying = true;
             cancelButton.SetDisplay(false);
             progress = new ProgressReporter();
-            mapEditorService.RemoveAllEntityComponents();
+            if (changedColumns == null)
+                mapEditorService.RemoveAllEntityComponents();
+            else
+                mapEditorService.RemoveEntitiesInColumns(changedColumns);
             var stopwatch = Stopwatch.StartNew();
             var frame = Stopwatch.StartNew();
             foreach (var rowFraction in mapEditorService.SetVoxelsByRow(voxels))

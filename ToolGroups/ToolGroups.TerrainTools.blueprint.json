@@ -1,0 +1,7 @@
+{
+  "ToolGroupSpec": {
+    "Id": "TerrainTools",
+    "DisplayNameLocKey": "Ximsa.TerrainGenerator.Group.Tools",
+    "Icon": "Sprites/terrain-smoothing-button"
+  }
+}

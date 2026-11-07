@@ -28,8 +28,8 @@ Ximsa.TerrainGenerator.Progress.Failed,"Failed",-
 Ximsa.TerrainGenerator.Group.Generators,"Terrain Generators",-
 Ximsa.TerrainGenerator.Tool.Autoencoder,"Autoencoder Generator",-
 Ximsa.TerrainGenerator.Tool.Autoencoder.Description,"Generates new terrain from the current map with a neural autoencoder.",-
-Ximsa.TerrainGenerator.Tool.Smoothing,"Global Terrain Filter",-
-Ximsa.TerrainGenerator.Tool.Smoothing.Description,"Smooths the whole map with a median filter.",-
+Ximsa.TerrainGenerator.Tool.Smoothing,"Terrain Smoothing",-
+Ximsa.TerrainGenerator.Tool.Smoothing.Description,"Smooths the top surface of the whole map with a median filter. Overhangs below the surface are kept.",-
 Ximsa.TerrainGenerator.Progress.Starting,"Starting",-
 Ximsa.TerrainGenerator.Progress.Cancelled,"Cancelled - terrain unchanged",-
 Ximsa.TerrainGenerator.Tool.Noise3D,"3D Noise Generator",-
@@ -58,3 +58,4 @@ Ximsa.TerrainGenerator.Wfc.Coverage,"Pattern coverage (drops rare patterns)",-
 Ximsa.TerrainGenerator.Progress.ReadingMaps,"Reading maps",-
 Ximsa.TerrainGenerator.Progress.Learning,"Learning patterns",-
 Ximsa.TerrainGenerator.Progress.Solving,"Solving",-
+Ximsa.TerrainGenerator.Group.Tools,"Terrain Tools",-

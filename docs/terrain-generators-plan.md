@@ -170,7 +170,7 @@ A second button group, built with the same group code as the generator group, ho
 - **Cliff sharpening** (new): a post-generation filter that segregates terrain into flatter terraces with
   steeper cliffs between them, like typical Timberborn maps, for easier building placement
 
-To be planned in detail after this plan is done. Note that tree placement will need to spawn natural
+Planned in detail in [terrain-tools-plan.md](terrain-tools-plan.md). Note that tree placement will need to spawn natural
 resources, which this plan's generators deliberately leave out.
 
 ## Risks
