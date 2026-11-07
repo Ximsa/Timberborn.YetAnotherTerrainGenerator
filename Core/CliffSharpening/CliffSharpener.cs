@@ -8,13 +8,13 @@ public sealed class CliffSharpenerSettings
     public int RegionSize = 4;
 
     // regions smaller than this many tiles are merged into the neighbour with the closest height
-    public int MinRegionArea = 48;
+    public int MinRegionArea = 32;
 
     // plateau heights are multiples of this; it is also the smallest cliff height
     public int StepSize = 2;
 
     // 0 keeps the original surface, 1 flattens fully to the plateau heights
-    public double Strength = 1;
+    public double Strength = 0.5;
 }
 
 // Splits a surface into flat plateaus with cliffs between them, like typical Timberborn maps: watershed regions of

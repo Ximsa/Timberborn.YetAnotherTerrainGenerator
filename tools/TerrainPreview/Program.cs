@@ -15,7 +15,7 @@ using TerrainPreview;
 //       [--select lowestentropy|fewestpatterns|layerbylayer|scanline|centreoutward|randomorder] --out preview.png
 //   TerrainPreview threshold-sweep --sources a.timber,b.timber [--size 128x128x23] [--seed 1] [--start 0] --out-dir <dir>
 //   TerrainPreview map <file.timber> --out preview.png
-//   TerrainPreview sharpen <file.timber> [--region 4] [--min-area 48] [--step 2] [--strength 1] --out preview.png
+//   TerrainPreview sharpen <file.timber> [--region 4] [--min-area 32] [--step 2] [--strength 0.5] --out preview.png
 //   TerrainPreview rivers <file.timber> [--rivers 3] [--width 3] [--lake 150] [--seed 1] [--sharpen false]
 //       --out preview.png
 //   TerrainPreview trees <file.timber> [--rivers 0] [--forest 0.35] [--bush 0.12] [--patch 32] [--clump 6]
@@ -163,9 +163,9 @@ switch (args[0])
         var settings = new CliffSharpenerSettings
         {
             RegionSize = int.Parse(options.GetValueOrDefault("region", "4")),
-            MinRegionArea = int.Parse(options.GetValueOrDefault("min-area", "48")),
+            MinRegionArea = int.Parse(options.GetValueOrDefault("min-area", "32")),
             StepSize = int.Parse(options.GetValueOrDefault("step", "2")),
-            Strength = double.Parse(options.GetValueOrDefault("strength", "1"), System.Globalization.CultureInfo.InvariantCulture)
+            Strength = double.Parse(options.GetValueOrDefault("strength", "0.5"), System.Globalization.CultureInfo.InvariantCulture)
         };
         var sharpener = new CliffSharpener(settings, before.SizeX, before.SizeY);
         var after = Surface.WithHeights(before, sharpener.Sharpen(Surface.Heights(before)));

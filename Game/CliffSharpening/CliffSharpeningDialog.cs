@@ -25,12 +25,12 @@ public class CliffSharpeningDialog : TerrainJobDialog
         SetTitle(loc.T(TitleKey));
         Content.Add(new GameSliderInt()
             .SetLabel(loc.T(RegionSizeKey))
-            .SetHorizontalSlider(new SliderValues<int>(1, 12, settings.RegionSize))
+            .SetHorizontalSlider(new SliderValues<int>(2, 8, settings.RegionSize))
             .RegisterChange(regionSize => settings.RegionSize = regionSize)
             .AddEndLabel(value => $"{value}"));
         Content.Add(new GameSliderInt()
             .SetLabel(loc.T(MinRegionAreaKey))
-            .SetHorizontalSlider(new SliderValues<int>(1, 256, settings.MinRegionArea))
+            .SetHorizontalSlider(new SliderValues<int>(16, 128, settings.MinRegionArea))
             .RegisterChange(minRegionArea => settings.MinRegionArea = minRegionArea)
             .AddEndLabel(value => $"{value}"));
         Content.Add(new GameSliderInt()

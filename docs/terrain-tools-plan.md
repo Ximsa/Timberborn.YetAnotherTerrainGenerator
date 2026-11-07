@@ -98,8 +98,9 @@ The terrain tools work on a heightmap, but must not destroy 3D terrain:
   area always merge).
 - Each region gets the median of its original surface heights, snapped to the step size (halves round up).
 - No ramps: beavers need stairs for any terrain step anyway.
-- Settings: region size, minimum region area, step size (default 2), strength (blend between original and plateau
-  height, default full). One progress stage.
+- Settings: region size (2..8, default 4), smallest plateau (16..128 tiles, default 32), step size (default 2),
+  strength (blend between original and plateau
+  height, 0..100%, default 50%). One progress stage.
 - Offline preview: `TerrainPreview sharpen <file.timber>`. On ThousandIslands (256 x 256) it takes about 0.7 s and
   keeps every height level (e.g. tiles at 16 stay 16, at 12 stay 12 on average).
 
