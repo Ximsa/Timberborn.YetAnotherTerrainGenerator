@@ -41,4 +41,34 @@
         <PackageReference Include="NumSharp" Version="0.30.0"/>
         <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.3" PrivateAssets="all"/>
     </ItemGroup>
+
+    <!-- After every build, copy the mod into release/ and into the game's Mods folder, which the game loads it from.
+         manifest.json and Imports/ are not tracked and stay as they are. Build with -p:DeployMod=false to skip. -->
+    <PropertyGroup>
+        <DeployMod Condition="'$(DeployMod)' == ''">true</DeployMod>
+        <ModVersionFolder>version-1.1</ModVersionFolder>
+    </PropertyGroup>
+
+    <Target Name="DeployMod" AfterTargets="Build" Condition="'$(DeployMod)' == 'true'">
+        <ItemGroup>
+            <_ModRoot Include="$(MSBuildProjectDirectory)\release"/>
+            <_ModRoot Include="$(TimberbornModsDir)\TerrainGen" Condition="Exists('$(TimberbornModsDir)')"/>
+            <_ModLocalization Include="Localizations\*.csv"/>
+            <_ModSprite Include="Sprites\*.png"/>
+            <_ModToolGroup Include="ToolGroups\*.json"/>
+            <_ModModel Include="Models\*"/>
+        </ItemGroup>
+        <!-- a running game locks the DLL; warn instead of failing the build -->
+        <Copy SourceFiles="$(TargetPath)" DestinationFolder="%(_ModRoot.Identity)\$(ModVersionFolder)"
+              SkipUnchangedFiles="true" ContinueOnError="WarnAndContinue"/>
+        <Copy SourceFiles="@(_ModLocalization)" DestinationFolder="%(_ModRoot.Identity)\$(ModVersionFolder)\Localizations"
+              SkipUnchangedFiles="true" ContinueOnError="WarnAndContinue"/>
+        <Copy SourceFiles="@(_ModSprite)" DestinationFolder="%(_ModRoot.Identity)\$(ModVersionFolder)\Sprites"
+              SkipUnchangedFiles="true" ContinueOnError="WarnAndContinue"/>
+        <Copy SourceFiles="@(_ModToolGroup)" DestinationFolder="%(_ModRoot.Identity)\$(ModVersionFolder)\ToolGroups"
+              SkipUnchangedFiles="true" ContinueOnError="WarnAndContinue"/>
+        <Copy SourceFiles="@(_ModModel)" DestinationFolder="%(_ModRoot.Identity)\Models"
+              SkipUnchangedFiles="true" ContinueOnError="WarnAndContinue"/>
+        <Message Importance="high" Text="Deployed the mod to %(_ModRoot.Identity)"/>
+    </Target>
 </Project>

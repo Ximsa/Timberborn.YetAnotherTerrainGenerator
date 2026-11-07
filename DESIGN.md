@@ -54,6 +54,5 @@ clicks instead of hours of brushing.
 - Final icons for all tools.
 - More variety from the Autoencoder Generator: fine-tuning on the built-in maps (see `docs/autoencoder-tuning.md`).
 - WFC speed on large maps with many patterns (one in-game run took about 6.5 minutes).
-- Automatic deployment of builds into the game's Mods folder.
 
 Details, decisions and their reasons are in the plans in `docs/`; how to work in the repo is in `AGENTS.md`.

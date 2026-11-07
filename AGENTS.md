@@ -37,9 +37,13 @@ Every tool opens a dialog with settings; nothing reacts to clicks on the map.
 
 The game loads the mod from `C:\Users\monik\OneDrive\Dokumente\Timberborn\Mods\TerrainGen`, **not** from this repo.
 `release/` (gitignored) mirrors that layout: `version-1.1/` (DLL, `manifest.json`, `Localizations`, `Sprites`,
-`ToolGroups`, `Imports`) and `Models/` at the mod root (`ModStarter.OriginPath`). After building, copy the DLL and any
-changed texts, icons, blueprints and models into `release/`, then into the Mods folder, and restart the game.
-The version is in `release/version-1.1/manifest.json`.
+`ToolGroups`, `Imports`) and `Models/` at the mod root (`ModStarter.OriginPath`).
+
+Every build of the mod runs the `DeployMod` target in the csproj, which copies the DLL, texts, icons, tool group
+blueprints and models into both `release/` and the Mods folder (unchanged files are skipped). If the game is running,
+the locked DLL only causes a warning: close the game and build again. Skip it with `-p:DeployMod=false`.
+`manifest.json` (with the version) and `Imports/` are not tracked and are not copied; edit them in place in both
+folders. Restart the game after deploying.
 
 ## Testing
 
