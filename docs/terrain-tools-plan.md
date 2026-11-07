@@ -17,8 +17,8 @@ A second bottom-bar button group, **Terrain Tools**, built with the same group c
 | 0 Spikes | API found in game code (see findings); not yet confirmed in game |
 | 1 Group, smoothing, surface editing | Built; not yet tested in game |
 | 2 Cliff Sharpening | Built and previewed offline; not yet tested in game |
-| 3 River Carver | Not started |
-| 4 Tree Placement | Not started |
+| 3 River Carver | Algorithm built and previewed offline; game dialog and water source spawning still to do |
+| 4 Tree Placement | Algorithm built and previewed offline (`TerrainPreview trees`); game dialog and spawning still to do |
 | 5 Polish and release | Not started |
 
 ## Decisions
@@ -30,7 +30,8 @@ A second bottom-bar button group, **Terrain Tools**, built with the same group c
 | Entities | Terrain tools remove only entities on columns whose surface changed; the generators keep wiping everything |
 | Cliff Sharpening | Region-based plateaus: watershed regions on the smoothed height, each region flattened to its median height snapped to a step size |
 | River placement | Pick a random point, hill-climb to the top, put the river head half way between the point and the top |
-| River course | Steepest descent from the head (breaching small pits) until a map edge or a large basin, which becomes a lake |
+| River course | Steepest descent from the head, filling pits on the way, until a map edge, another river or a large basin, which becomes a lake |
+| River depth | A river lowers the terrain by at most 1 block anywhere |
 | River water | A water source entity at each river head |
 | Trees | Noise-driven forest patches mixing tree species, and separate noise-driven patches mixing bush species; trees and bushes never share a patch |
 | Existing trees | Tree Placement removes all natural resources first, then places new ones |
@@ -104,17 +105,21 @@ The terrain tools work on a heightmap, but must not destroy 3D terrain:
 
 ### Phase 3: River Carver
 
-- For each river: pick a random land column (seeded), hill-climb (steepest ascent, 8 neighbours) to a local top,
-  put the head on the climbed path half way between the start point and the top.
-- Course: from the head, follow steepest descent over the surface; at a pit, fill it (priority flood) until it
-  overflows, and if the filled area stays smaller than the lake size setting, breach through to the outlet and
-  continue. Stop at a map edge or when the filled area reaches the lake size; that basin becomes a lake.
-- Carve: lower each course column to a bed that falls monotonically from head to mouth, by the depth setting; widen
-  to the width setting with a gentle bank profile. Lakes are dug to the depth setting below their spill level.
-- Place a water source at the head, strength scaled by width.
-- Rivers stay apart from each other's heads; a later river may join an earlier one (stops on reaching its bed).
-- Settings: number of rivers, width, depth, lake size, water source strength, seed.
-- Progress stages: finding heads, tracing courses, carving, placing water sources.
+- For each river: pick random columns (seeded), hill-climb each (steepest ascent on a lightly smoothed surface, so
+  terrace flats do not stall it) to a local top, and put the head on the climbed path at the first point half way up
+  in height. Of 50 random starts the one with the biggest climb wins (heads on small bumps gave rivers of a few
+  tiles); heads within a sixth of the map from the edge, or near earlier heads, are skipped.
+- Course: from the head, follow steepest descent; at a pit or flat, flood lowest first (ties broken by distance, so
+  paths across flats are straight) until the water spills over the rim, then continue from there. Stop at a map
+  edge, on an earlier river, or when the flooded area below the water level reaches the lake size; that basin
+  becomes a lake.
+- Carve: **at most 1 block below the original terrain, anywhere**: the bed follows a line that never
+  rises from head to mouth where the 1-block limit allows, across the width setting; lakes too. No banks, no depth
+  setting. Rims are not cut through; the water fills pits on its way, as Timberborn water does.
+- Place a water source at the head.
+- Settings: number of rivers, width, lake size, water source strength, seed. One progress stage.
+- Offline preview: `TerrainPreview rivers <file.timber>`, or `--rivers N` after any map-producing command (e.g.
+  `noise3d`). Water is drawn blue, heads red.
 
 ### Phase 4: Tree Placement
 

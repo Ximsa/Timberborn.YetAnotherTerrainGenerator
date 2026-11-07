@@ -7,12 +7,16 @@ using TerrainPreview;
 
 // Usage:
 //   TerrainPreview noise3d --size 128x128x23 --seed 1 [--climate rainforest|varyingbiomes] [--base 56] [--vscale 3]
-//       [--hscale 3] --out preview.png
+//       [--hscale 3] [--rivers 1] [--river-seed 1] --out preview.png   (--rivers works after any map-producing command)
 //   TerrainPreview wfc --sources a.timber,b.timber --size 64x64x23 --seed 1 [--n 3] [--symmetry true]
 //       [--periodic false] [--penalty 0.5] [--threshold 0.25] [--coverage 0.95] [--block 4] [--seeds 1-10] --out preview.png
 //   TerrainPreview threshold-sweep --sources a.timber,b.timber [--size 128x128x23] [--seed 1] [--start 0] --out-dir <dir>
 //   TerrainPreview map <file.timber> --out preview.png
 //   TerrainPreview sharpen <file.timber> [--region 4] [--min-area 48] [--step 2] [--strength 1] --out preview.png
+//   TerrainPreview rivers <file.timber> [--rivers 3] [--width 3] [--lake 150] [--seed 1] [--sharpen false]
+//       --out preview.png
+//   TerrainPreview trees <file.timber> [--rivers 0] [--forest 0.35] [--bush 0.12] [--patch 32] [--clump 6]
+//       [--density 0.5] [--seed 1] [--sharpen false] --out preview.png
 if (args.Length == 0)
 {
     Console.WriteLine("usage: TerrainPreview noise3d|map ... --out <file.png>");
@@ -172,13 +176,103 @@ switch (args[0])
         Console.WriteLine($"wrote {output}");
         return 0;
     }
+    case "rivers":
+    case "trees":
+    {
+        // optional sharpening, then rivers (blue, heads red), then for "trees" the plants (dark green trees in
+        // shades per species, yellow-green bushes)
+        using var file = File.OpenRead(args[1]);
+        var before = MapVoxelReader.Read(file);
+        var heights = Surface.Heights(before);
+        if (options.GetValueOrDefault("sharpen", "false") == "true")
+            heights = new CliffSharpener(new CliffSharpenerSettings(), before.SizeX, before.SizeY).Sharpen(heights);
+        var seed = int.Parse(options.GetValueOrDefault("seed", "1"));
+        var riverSettings = new RiverCarverSettings
+        {
+            Rivers = int.Parse(options.GetValueOrDefault("rivers", args[0] == "rivers" ? "3" : "0")),
+            Width = int.Parse(options.GetValueOrDefault("width", "3")),
+            LakeSize = int.Parse(options.GetValueOrDefault("lake", "150")),
+            Seed = seed
+        };
+        var carver = new RiverCarver(riverSettings, before.SizeX, before.SizeY);
+        heights = carver.Carve(heights);
+        Console.WriteLine($"carved {carver.Heads.Count} rivers ({carver.Water.Count(w => w)} water tiles) in " +
+                          $"{stopwatch.ElapsedMilliseconds} ms; heads at " +
+                          string.Join(", ", carver.Heads.Select(h => $"({h.X}, {h.Y}, z {h.Z})")));
+        var after = Surface.WithHeights(before, heights);
+        var colors = new Dictionary<(int, int), Rgb>();
+        for (var i = 0; i < carver.Water.Length; i++)
+            if (carver.Water[i])
+                colors[(i % before.SizeX, i / before.SizeX)] = new Rgb(60, 120, 220);
+        if (args[0] == "trees")
+        {
+            var treeSettings = new TreePlacerSettings
+            {
+                ForestCoverage = Double("forest", "0.35"),
+                BushCoverage = Double("bush", "0.12"),
+                PatchSize = int.Parse(options.GetValueOrDefault("patch", "32")),
+                ClumpSize = int.Parse(options.GetValueOrDefault("clump", "6")),
+                Density = Double("density", "0.5"),
+                // stand-ins for the game's species: four trees and two bushes
+                TreeWeights = new[] { 1.0, 1.0, 1.0, 0.5 },
+                BushWeights = new[] { 1.0, 1.0 },
+                Seed = seed
+            };
+            var placer = new TreePlacer(treeSettings, before.SizeX, before.SizeY);
+            var run = Stopwatch.StartNew();
+            var plants = placer.Place(heights, carver.Water);
+            Console.WriteLine($"placed {plants.Count(p => p.Kind == PlantKind.Tree)} trees and " +
+                              $"{plants.Count(p => p.Kind == PlantKind.Bush)} bushes in {run.ElapsedMilliseconds} ms");
+            Rgb[] treeColors = { new(20, 70, 30), new(40, 95, 35), new(15, 55, 60), new(80, 60, 30) };
+            Rgb[] bushColors = { new(180, 200, 60), new(220, 120, 160) };
+            foreach (var plant in plants)
+                colors[(plant.X, plant.Y)] = plant.Kind == PlantKind.Tree
+                    ? treeColors[plant.Species]
+                    : bushColors[plant.Species];
+        }
+
+        foreach (var head in carver.Heads)
+            colors[(head.X, head.Y)] = new Rgb(230, 40, 40);
+        PrintStats(after);
+        Sheet(new List<(string, Image)>
+        {
+            ("before", VoxelRenderer.Render(before)),
+            ("after", VoxelRenderer.Render(after, (x, y) => colors.TryGetValue((x, y), out var c) ? c : null))
+        }).SavePng(output);
+        Console.WriteLine($"wrote {output}");
+        return 0;
+
+        double Double(string key, string fallback)
+        {
+            return double.Parse(options.GetValueOrDefault(key, fallback), System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
     default:
         Console.WriteLine($"unknown generator {args[0]}");
         return 1;
 }
 
+Func<int, int, Rgb?>? overlay = null;
+if (options.TryGetValue("rivers", out var riverCount))
+{
+    // carve rivers into the generated map: water blue, heads red
+    var carver = new RiverCarver(new RiverCarverSettings
+    {
+        Rivers = int.Parse(riverCount),
+        Seed = int.Parse(options.GetValueOrDefault("river-seed", options.GetValueOrDefault("seed", "1")))
+    }, map.SizeX, map.SizeY);
+    map = Surface.WithHeights(map, carver.Carve(Surface.Heights(map)));
+    Console.WriteLine($"carved {carver.Heads.Count} river(s), {carver.Water.Count(w => w)} water tiles, heads at " +
+                      string.Join(", ", carver.Heads.Select(h => $"({h.X}, {h.Y}, z {h.Z})")));
+    var heads = carver.Heads.Select(h => (h.X, h.Y)).ToHashSet();
+    var water = carver.Water;
+    var width = map.SizeX;
+    overlay = (x, y) => heads.Contains((x, y)) ? new Rgb(230, 40, 40)
+        : water[y * width + x] ? new Rgb(60, 120, 220) : null;
+}
+
 PrintStats(map);
-VoxelRenderer.Render(map).SavePng(output);
+VoxelRenderer.Render(map, overlay).SavePng(output);
 Console.WriteLine($"wrote {output} after {stopwatch.ElapsedMilliseconds} ms");
 return 0;
 

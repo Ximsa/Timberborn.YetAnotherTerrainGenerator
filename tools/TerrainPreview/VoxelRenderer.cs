@@ -4,6 +4,7 @@ namespace TerrainPreview;
 
 // Renders a VoxelMap as one preview image: an isometric 3D view on top, and below it a top-down height map
 // (columns with overhangs or floating terrain tinted magenta) next to a vertical cross-section through the middle.
+// An optional overlay colours the top surface of single columns (water, plants, markers).
 public static class VoxelRenderer
 {
     private static readonly Rgb Background = new(32, 34, 40);
@@ -19,10 +20,10 @@ public static class VoxelRenderer
         (1.0, new Rgb(240, 240, 240))
     };
 
-    public static Image Render(VoxelMap map)
+    public static Image Render(VoxelMap map, Func<int, int, Rgb?>? overlay = null)
     {
-        var iso = RenderIsometric(map);
-        var heights = RenderHeightMap(map);
+        var iso = RenderIsometric(map, overlay);
+        var heights = RenderHeightMap(map, overlay);
         var section = RenderSection(map);
         const int gap = 16;
         var width = Math.Max(iso.Width, heights.Width + gap + section.Width) + 2 * gap;
@@ -48,7 +49,7 @@ public static class VoxelRenderer
         return HeightColors[^1].Color;
     }
 
-    public static Image RenderIsometric(VoxelMap map)
+    public static Image RenderIsometric(VoxelMap map, Func<int, int, Rgb?>? overlay = null)
     {
         // tile half width in pixels, and pixels per voxel of height
         var tile = Math.Max(1, Math.Min(4, 640 / (map.SizeX + map.SizeY)));
@@ -65,6 +66,15 @@ public static class VoxelRenderer
             return (originX + (x - y) * half, originY + (x + y) * half / 2 - z * voxelHeight);
         }
 
+        // the topmost solid voxel of its column
+        bool IsTop(int x, int y, int z)
+        {
+            for (var above = z + 1; above < map.SizeZ; above++)
+                if (map[x, y, above])
+                    return false;
+            return true;
+        }
+
         bool Solid(int x, int y, int z)
         {
             return x >= 0 && y >= 0 && z >= 0 && x < map.SizeX && y < map.SizeY && z < map.SizeZ && map[x, y, z];
@@ -78,6 +88,8 @@ public static class VoxelRenderer
             if (!map[x, y, z])
                 continue;
             var color = ColorFor(z, map.SizeZ);
+            if (!Solid(x, y, z + 1) && overlay?.Invoke(x, y) is { } tint && IsTop(x, y, z))
+                color = tint;
             if (!Solid(x, y, z + 1))
                 FillQuad(image, color, Project(x, y, z + 1), Project(x + 1, y, z + 1), Project(x + 1, y + 1, z + 1),
                     Project(x, y + 1, z + 1));
@@ -123,7 +135,7 @@ public static class VoxelRenderer
         return true;
     }
 
-    private static Image RenderHeightMap(VoxelMap map)
+    private static Image RenderHeightMap(VoxelMap map, Func<int, int, Rgb?>? overlay = null)
     {
         var scale = Math.Max(1, Math.Min(4, 320 / Math.Max(map.SizeX, map.SizeY)));
         var image = new Image(map.SizeX * scale, map.SizeY * scale, Background);
@@ -143,6 +155,8 @@ public static class VoxelRenderer
             var color = top < 0 ? Sky : ColorFor(top, map.SizeZ);
             if (hasGap)
                 color = color.Mix(Overhang, 0.6);
+            if (overlay?.Invoke(x, y) is { } tint)
+                color = tint;
             image.FillRect(x * scale, y * scale, scale, scale, color);
         }
 
