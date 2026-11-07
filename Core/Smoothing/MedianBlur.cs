@@ -1,24 +1,11 @@
 using NumSharp;
 
-namespace Timberborn.TerrainGenerator.Core.Common;
+namespace Timberborn.TerrainGenerator.Core.Smoothing;
 
-public static class NumSharpExtensions
+// Median filter on a heightmap: each value becomes the median of the square window around it (smaller at the edges),
+// which smooths noise while keeping cliffs sharper than an average would.
+public static class MedianBlurExtensions
 {
-    public static NDArray Scale2D(this NDArray input, Shape target, Action<float>? progress = null)
-    {
-        var result = np.zeros(target, np.float32);
-        var resize0 = (float)input.Shape[0] / target[0];
-        var resize1 = (float)input.Shape[1] / target[1];
-        for (var i = 0; i < target[0]; i++)
-        {
-            for (var j = 0; j < target[1]; j++)
-                result[i, j] = input[(int)(i * resize0), (int)(j * resize1)];
-            progress?.Invoke((i + 1f) / target[0]);
-        }
-
-        return result;
-    }
-
     public static NDArray MedianBlur(this NDArray input, int radius, int passes, Action<float>? progress = null)
     {
         var window = new float[(2 * radius + 1) * (2 * radius + 1)];

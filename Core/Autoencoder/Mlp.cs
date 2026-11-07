@@ -1,9 +1,10 @@
 using System.IO.Compression;
 using System.Text;
 
-namespace AutoencoderTuner;
+namespace Timberborn.TerrainGenerator.Core.Autoencoder;
 
-// The mod's dense ReLU network (three layers, PyTorch layout weight[out, in]) as stored in Models/*.npz.
+// The autoencoder's dense ReLU networks (three layers, PyTorch layout weight[out, in]) as stored in Models/*.npz,
+// in plain C# so it runs the same in the game and in the offline tools.
 public sealed class Mlp
 {
     public const int Layers = 3;
@@ -16,7 +17,8 @@ public sealed class Mlp
     public static Mlp Load(string path)
     {
         var mlp = new Mlp();
-        using var zip = ZipFile.OpenRead(path);
+        using var file = File.OpenRead(path);
+        using var zip = new ZipArchive(file, ZipArchiveMode.Read);
         for (var layer = 0; layer < Layers; layer++)
         {
             var (weights, shape) = ReadNpy(zip, $"{layer + 1}.weight.npy");
@@ -29,11 +31,11 @@ public sealed class Mlp
         return mlp;
     }
 
-    // writes the same entries as the original files, so NumSharp's Load_Npz reads them like before
+    // writes the same entries as the original files (numpy's npz format)
     public void Save(string path)
     {
-        if (File.Exists(path)) File.Delete(path);
-        using var zip = ZipFile.Open(path, ZipArchiveMode.Create);
+        using var file = File.Create(path);
+        using var zip = new ZipArchive(file, ZipArchiveMode.Create);
         WriteNpy(zip, "allow_pickle.npy", "|b1", Array.Empty<int>(), new byte[] { 0 });
         for (var layer = 0; layer < Layers; layer++)
         {
@@ -78,7 +80,7 @@ public sealed class Mlp
             throw new InvalidDataException($"{name}: expected little-endian float32 in C order, got {header}");
         var shapeText = header[(header.IndexOf("'shape': (", StringComparison.Ordinal) + 10)..];
         shapeText = shapeText[..shapeText.IndexOf(')')];
-        var shape = shapeText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        var shape = shapeText.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(part => part.Trim())
             .Select(int.Parse).ToArray();
         var data = new float[(bytes.Length - 10 - headerLength) / 4];
         Buffer.BlockCopy(bytes, 10 + headerLength, data, 0, data.Length * 4);

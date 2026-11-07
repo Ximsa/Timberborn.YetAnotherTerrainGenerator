@@ -1,6 +1,7 @@
 using NumSharp;
 using Timberborn.Localization;
 using Timberborn.TerrainGenerator.Core.Common;
+using Timberborn.TerrainGenerator.Core.Smoothing;
 using Timberborn.TerrainGenerator.Game.Common;
 using TimberUi.CommonUi;
 using UnityEngine.UIElements;

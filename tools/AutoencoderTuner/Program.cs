@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using AutoencoderTuner;
 using Timberborn.TerrainGenerator.Core.Common;
 using Timberborn.TerrainGenerator.Core.Autoencoder;
 using TerrainPreview;
@@ -14,9 +13,9 @@ using TerrainPreview;
 //       ran on it afterwards, since the layer is linear
 //   AutoencoderTuner preview --maps <dir> [--current Diorama] [--decoder ...] [--stats ...] [--variety 1.5] [--keep 0]
 //       [--legacy-multiplier -1 --legacy-noise 1] [--samples 8] [--size 256] [--seed 1]
-//       [--median-passes 0 --median-radius 4] [--sigma 1.5] --out preview.png
-//       generates like the mod's pipeline and prints diversity (how different samples are) and relief; the median
-//       filter the generator used to run afterwards (one pass, radius 4) is off unless --median-passes is given
+//       [--sigma 1.5] --out preview.png
+//       generates with the mod's own AutoencoderGenerator and prints diversity (how different samples are) and
+//       relief
 var options = ParseOptions(args.Skip(1));
 var models = options.GetValueOrDefault("models", "Models");
 var stopwatch = Stopwatch.StartNew();
@@ -25,8 +24,9 @@ switch (args.FirstOrDefault())
     case "stats":
     {
         var encoder = Mlp.Load(options.GetValueOrDefault("encoder", Path.Combine(models, "Encoder2D.npz")));
-        var latents = ReadMaps(options["maps"]).Select(map => encoder.Run(Pipeline.Normalize(map.Heights,
-            map.SizeX, map.SizeY, Pipeline.InputSize))).ToList();
+        var inputSize = (int)Math.Sqrt(encoder.Inputs[0]);
+        var latents = ReadMaps(options["maps"]).Select(map => encoder.Run(
+            AutoencoderGenerator.NormalizeInput(map.Heights, map.SizeX, map.SizeY, inputSize))).ToList();
         var stats = LatentStats.From(latents);
         stats.Save(options["out"]);
         Console.WriteLine($"{latents.Count} maps; mean {Join(stats.Mean)}");
@@ -45,14 +45,21 @@ switch (args.FirstOrDefault())
     }
     case "preview":
     {
-        var encoder = Mlp.Load(options.GetValueOrDefault("encoder", Path.Combine(models, "Encoder2D.npz")));
-        var decoder = Mlp.Load(options.GetValueOrDefault("decoder", Path.Combine(models, "Decoder2D.npz")));
+        var generator = new AutoencoderGenerator(
+            Mlp.Load(options.GetValueOrDefault("encoder", Path.Combine(models, "Encoder2D.npz"))),
+            Mlp.Load(options.GetValueOrDefault("decoder", Path.Combine(models, "Decoder2D.npz"))),
+            LatentStats.Load(options.GetValueOrDefault("stats", Path.Combine(models, "LatentStats.txt"))));
+        var settings = new AutoencoderSettings
+        {
+            KeepCurrent = (float)Number("keep", "0"),
+            Variety = (float)Number("variety", "1.5"),
+            BlurSigma = Number("sigma", GaussianBlur.DefaultSigma.ToString(CultureInfo.InvariantCulture))
+        };
         var maps = ReadMaps(options["maps"]);
         var size = int.Parse(options.GetValueOrDefault("size", "256"));
         var current = maps.First(m => m.Name == options.GetValueOrDefault("current", "Diorama"));
         var random = new Random(int.Parse(options.GetValueOrDefault("seed", "1")));
-        var latent = encoder.Run(Pipeline.Normalize(current.Heights, current.SizeX, current.SizeY,
-            Pipeline.InputSize));
+        var latent = generator.Encode(current.Heights, current.SizeX, current.SizeY);
         Func<float[]> sample;
         if (options.TryGetValue("legacy-multiplier", out var legacyMultiplier))
         {
@@ -63,19 +70,13 @@ switch (args.FirstOrDefault())
         }
         else
         {
-            var stats = LatentStats.Load(options.GetValueOrDefault("stats", Path.Combine(models, "LatentStats.txt")));
-            var variety = (float)Number("variety", "1.5");
-            var keep = (float)Number("keep", "0");
-            sample = () => stats.Sample(latent, keep, variety, random);
+            sample = () => generator.Sample(latent, settings, random);
         }
 
         var samples = Enumerable.Range(0, int.Parse(options.GetValueOrDefault("samples", "8")))
-            .Select(_ => Pipeline.Finish(decoder.Run(sample()), size, 1.25f,
-                int.Parse(options.GetValueOrDefault("median-radius", "4")),
-                int.Parse(options.GetValueOrDefault("median-passes", "0")),
-                Number("sigma", GaussianBlur.DefaultSigma.ToString(CultureInfo.InvariantCulture)), random))
+            .Select(_ => generator.Finish(generator.Decode(sample()), size, size, settings, random))
             .ToList();
-        var real = maps.Select(m => Pipeline.Normalize(m.Heights, m.SizeX, m.SizeY, size)).ToList();
+        var real = maps.Select(m => AutoencoderGenerator.NormalizeInput(m.Heights, m.SizeX, m.SizeY, size)).ToList();
         Console.WriteLine($"samples: diversity {Diversity(samples):F3}, relief {Relief(samples, size):F3} | " +
                           $"built-in maps: diversity {Diversity(real):F3}, relief {Relief(real, size):F3}");
         Sheet(samples, size).SavePng(options["out"]);
@@ -100,14 +101,14 @@ static string Join(float[] values)
 }
 
 // surface heights of every map in a folder
-static List<(string Name, int[] Heights, int SizeX, int SizeY)> ReadMaps(string folder)
+static List<(string Name, float[] Heights, int SizeX, int SizeY)> ReadMaps(string folder)
 {
     return Directory.GetFiles(folder, "*.timber").OrderBy(f => f).Select(path =>
     {
         using var file = File.OpenRead(path);
         var map = MapVoxelReader.Read(file);
         return (Path.GetFileNameWithoutExtension(path),
-            Surface.Heights(map), map.SizeX, map.SizeY);
+            Surface.Heights(map).Select(height => (float)height).ToArray(), map.SizeX, map.SizeY);
     }).ToList();
 }
 

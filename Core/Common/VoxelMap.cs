@@ -41,17 +41,15 @@ public sealed class VoxelMap
             terrain.flatten().ToArray<bool>());
     }
 
-    // heightmap shaped (y, x); each column becomes solid from the bottom up to its height, at least 1 voxel
-    public static VoxelMap FromHeightmap(NDArray heightmap, int sizeZ)
+    // heights indexed y * sizeX + x, cut to whole voxels; each column becomes solid from the bottom up to its height,
+    // at least 1 voxel
+    public static VoxelMap FromHeightmap(float[] heights, int sizeX, int sizeY, int sizeZ)
     {
-        var sizeY = heightmap.Shape[0];
-        var sizeX = heightmap.Shape[1];
-        var heights = heightmap.astype(np.int32).flatten().ToArray<int>();
         var map = new VoxelMap(sizeX, sizeY, sizeZ, new bool[sizeX * sizeY * sizeZ]);
         for (var y = 0; y < sizeY; y++)
         for (var x = 0; x < sizeX; x++)
         {
-            var height = Math.Max(1, Math.Min(sizeZ, heights[y * sizeX + x]));
+            var height = Math.Max(1, Math.Min(sizeZ, (int)heights[y * sizeX + x]));
             for (var z = 0; z < height; z++)
                 map[x, y, z] = true;
         }

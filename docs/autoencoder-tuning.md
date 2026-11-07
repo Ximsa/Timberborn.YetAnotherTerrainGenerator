@@ -44,7 +44,7 @@ Not tested in game yet.
 
 The generator enlarges the decoder's 128 x 128 output to the map by nearest neighbour, which leaves square blocks of
 2-3 tiles. A median filter (one pass, radius 4, with sliders) used to hide them. It is replaced by a fixed Gaussian
-blur (`Generators/Autoencoder/GaussianBlur.cs`, sigma 1.5 tiles, clamped edges) without sliders:
+blur (`Core/Autoencoder/GaussianBlur.cs`, sigma 1.5 tiles, clamped edges) without sliders:
 
 | Output filter | Diversity | Relief |
 |---|---|---|
@@ -56,4 +56,6 @@ blur (`Generators/Autoencoder/GaussianBlur.cs`, sigma 1.5 tiles, clamped edges) 
 | Built-in maps | 0.258 | 0.271 |
 
 Sigma 1.5 removes the block grid and matches the built-in maps' relief, keeping finer shapes than the median.
-The tuner's `preview` takes `--sigma` and, to reproduce the older numbers, `--median-passes 1`.
+The tuner's `preview` takes `--sigma`. Since the refactor (Core/Game split) the tuner runs the mod's own
+`AutoencoderGenerator`, so its previews are exactly what the game generates; the median option is gone with it (the
+median numbers above came from the tuner before that change).
