@@ -101,7 +101,7 @@ public class TerrainGeneratorDialog : TerrainJobDialog
         //decoded = np.tanh(decoded, NPTypeCode.Float) + 0.25f * decoded;
         decoded = decoded.reshape(inputDim, inputDim);
 
-        decoded = progress.Stage(ScalingKey, 0.15f, 1f, report =>
+        decoded = progress.Stage(ScalingKey, 0.15f, 0.9f, report =>
         {
             // zoom
             if (decoded.Shape[0] < mapSize.y || decoded.Shape[1] < mapSize.x)
@@ -122,6 +122,14 @@ public class TerrainGeneratorDialog : TerrainJobDialog
             var offsetDim1 = rand.Next(0, maxDim1 + 1);
             return decoded[
                 $"{offsetDim0}:{mapSize.y + offsetDim0},{offsetDim1}:{mapSize.x + offsetDim1}"];
+        });
+
+        // round off the square blocks that enlarging by nearest neighbour leaves
+        decoded = progress.Stage(FilteringKey, 0.9f, 1f, _ =>
+        {
+            var blurred = GaussianBlur.Apply(decoded.astype(np.float32).flatten().ToArray<float>(), mapSize.x,
+                mapSize.y, GaussianBlur.DefaultSigma);
+            return np.array(blurred).reshape(mapSize.y, mapSize.x);
         });
 
         // stretch to the map's height

@@ -1,3 +1,5 @@
+using Timberborn.TerrainGenerator.Generators.Autoencoder;
+
 namespace AutoencoderTuner;
 
 // The autoencoder generator's pipeline outside the game (TerrainGeneratorDialog.Pipeline2D), on plain arrays.
@@ -16,9 +18,9 @@ public static class Pipeline
         return result.Select(h => h / max).ToArray();
     }
 
-    // decoded 128 x 128 output -> scaled to the map, zoomed, randomly cropped, optionally median filtered (the generator
-    // no longer does this), normalised to 0..1
-    public static float[] Finish(float[] decoded, int side, float zoom, int medianRadius, int medianPasses,
+    // decoded 128 x 128 output -> scaled to the map, zoomed, randomly cropped, Gaussian blurred (like the generator),
+    // optionally median filtered (the generator used to), normalised to 0..1
+    public static float[] Finish(float[] decoded, int side, float zoom, int medianRadius, int medianPasses, double sigma,
         Random random)
     {
         var map = Scale(decoded, InputSize, side);
@@ -29,6 +31,7 @@ public static class Pipeline
         for (var y = 0; y < side; y++)
         for (var x = 0; x < side; x++)
             cropped[y * side + x] = map[(y + offsetY) * zoomed + x + offsetX];
+        cropped = GaussianBlur.Apply(cropped, side, side, sigma);
         for (var pass = 0; pass < medianPasses; pass++)
             cropped = Median(cropped, side, medianRadius);
         float min = cropped.Min(), max = cropped.Max();

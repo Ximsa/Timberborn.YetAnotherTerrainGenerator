@@ -39,3 +39,21 @@ dotnet run --project tools/AutoencoderTuner -c Release -- preview --maps <built-
 
 The stats are computed with the untuned encoder, so they stay valid after sharpening the decoder.
 Not tested in game yet.
+
+## Output filter: Gaussian instead of median (2026-11-07)
+
+The generator enlarges the decoder's 128 x 128 output to the map by nearest neighbour, which leaves square blocks of
+2-3 tiles. A median filter (one pass, radius 4, with sliders) used to hide them. It is replaced by a fixed Gaussian
+blur (`Generators/Autoencoder/GaussianBlur.cs`, sigma 1.5 tiles, clamped edges) without sliders:
+
+| Output filter | Diversity | Relief |
+|---|---|---|
+| Median, radius 4 (before) | 0.157 | 0.239 |
+| None (block grid visible) | 0.149 | 0.399 |
+| Gaussian, sigma 1.0 | 0.148 | 0.322 |
+| **Gaussian, sigma 1.5 (shipped)** | 0.151 | 0.280 |
+| Gaussian, sigma 2.0 | 0.154 | 0.252 |
+| Built-in maps | 0.258 | 0.271 |
+
+Sigma 1.5 removes the block grid and matches the built-in maps' relief, keeping finer shapes than the median.
+The tuner's `preview` takes `--sigma` and, to reproduce the older numbers, `--median-passes 1`.
