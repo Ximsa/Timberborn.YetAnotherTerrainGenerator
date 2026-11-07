@@ -8,7 +8,7 @@ Ximsa.TerrainGenerator.Radius,"Radius of the Filter",-
 Ximsa.TerrainGenerator.Apply,"Apply",-
 Ximsa.TerrainGenerator.ZoomFactor,"Zoom Factor",-
 Ximsa.TerrainGenerator.Cancel,"Cancel",-
-Ximsa.TerrainGenerator.MaxHeight,"Maximum Terrain Height",-
+Ximsa.TerrainGenerator.MaxHeight,"Maximum terrain height (when normalizing)",-
 Ximsa.TerrainGenerator.SharpenTitle,"Sharpening Tool",-
 Ximsa.TerrainGenerator.SharpenStrength,"Sharpening Strength",-
 Ximsa.TerrainGenerator.SharpenSize,"Sharpening Kernel Range",-
@@ -84,3 +84,4 @@ Ximsa.TerrainGenerator.Wfc.CellSelection.LayerByLayer,"Layer by layer (ground fi
 Ximsa.TerrainGenerator.Wfc.CellSelection.Scanline,"Scanline (fixed order)",-
 Ximsa.TerrainGenerator.Wfc.CellSelection.CentreOutward,"Centre outward",-
 Ximsa.TerrainGenerator.Wfc.CellSelection.RandomOrder,"Random order",-
+Ximsa.TerrainGenerator.Normalize,"Normalize: stretch the terrain to fill the map's height",-

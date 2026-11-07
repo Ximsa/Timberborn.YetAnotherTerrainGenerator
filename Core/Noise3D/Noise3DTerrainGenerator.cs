@@ -15,6 +15,10 @@ public sealed class Noise3DSettings
     // 0 gives rounded hills and peaks, 1 rugged ones; 0.5 keeps the noise as it is
     public double Ruggedness = 0.5;
 
+    // stretch the generated terrain vertically so that its highest completely solid layer becomes the map's bottom
+    // and the lowest completely empty layer above it the map's top; overrides base level and vertical scale
+    public bool Normalize;
+
     // 3D Noise height that becomes Timberborn height 0 (just below sea level, so oceans become shallow basins)
     public double BaseLevel = SeaLevel - 8;
 
@@ -56,7 +60,7 @@ public sealed class Noise3DTerrainGenerator
     private const int CellHeight = 8;
     private const int GridHeight = Noise3DSettings.WorldHeight / CellHeight + 1;
 
-    private readonly double baseLevel;
+    private double baseLevel;
     private readonly double horizontalScale;
     private readonly int gridX;
     private readonly int gridZ;
@@ -64,7 +68,7 @@ public sealed class Noise3DTerrainGenerator
     private readonly int sizeX;
     private readonly int sizeY;
     private readonly int sizeZ;
-    private readonly double verticalScale;
+    private double verticalScale;
 
     private double[]? density;
 
@@ -173,6 +177,9 @@ public sealed class Noise3DTerrainGenerator
         if (density == null)
             throw new InvalidOperationException("ComputeDensity must run first");
 
+        if (settings.Normalize)
+            FitTerrainToMapHeight();
+
         var voxels = new VoxelMap(sizeX, sizeY, sizeZ, new bool[sizeX * sizeY * sizeZ]);
         for (var y = 0; y < sizeY; y++)
         {
@@ -192,6 +199,46 @@ public sealed class Noise3DTerrainGenerator
         }
 
         return voxels;
+    }
+
+    // chooses the vertical slice of the world so the terrain fills the map: the highest world layer that is solid in
+    // every column lands just above the map's bottom layer, and the lowest layer above it that is empty in every column
+    // lands just above the map's top. Measured in whole world blocks over the full world height, so peaks and islands
+    // the default slice would cut off are included.
+    private void FitTerrainToMapHeight()
+    {
+        var lowestAir = double.MaxValue;
+        var highestSolid = double.MinValue;
+        for (var y = 0; y < sizeY; y++)
+        {
+            var cellZ = (y + 0.5) * horizontalScale / CellWidth;
+            for (var x = 0; x < sizeX; x++)
+            {
+                var cellX = (x + 0.5) * horizontalScale / CellWidth;
+                // first empty block from the bottom: everything below is solid in this column
+                var air = 0;
+                while (air < Noise3DSettings.WorldHeight && Solid(air))
+                    air++;
+                lowestAir = Math.Min(lowestAir, air);
+                // highest solid block of the column
+                var top = Noise3DSettings.WorldHeight - 1;
+                while (top >= 0 && !Solid(top))
+                    top--;
+                highestSolid = Math.Max(highestSolid, top + 1);
+
+                bool Solid(int worldY)
+                {
+                    return SampleDensity(cellX, (worldY + 0.5) / CellHeight, cellZ) > 0;
+                }
+            }
+        }
+
+        if (highestSolid <= lowestAir)
+            return;
+        // tile z covers world heights baseLevel + z * verticalScale .. + verticalScale: lowestAir is the top of tile 0,
+        // highestSolid the top of the highest tile
+        verticalScale = (highestSolid - lowestAir) / (sizeZ - 1);
+        baseLevel = lowestAir - verticalScale;
     }
 
     private double SampleDensity(double x, double y, double z)

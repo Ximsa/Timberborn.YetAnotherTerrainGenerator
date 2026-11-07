@@ -10,6 +10,7 @@ public class Noise3DGeneratorDialog : TerrainJobDialog
 {
     private const string TitleKey = "Ximsa.TerrainGenerator.Tool.Noise3D";
     private const string RuggednessKey = "Ximsa.TerrainGenerator.Noise3D.Ruggedness";
+    private const string NormalizeKey = "Ximsa.TerrainGenerator.Normalize";
     private const string HillinessKey = "Ximsa.TerrainGenerator.Noise3D.Hilliness";
     private const string BaseLevelKey = "Ximsa.TerrainGenerator.Noise3D.BaseLevel";
     private const string VerticalScaleKey = "Ximsa.TerrainGenerator.Noise3D.VerticalScale";
@@ -34,6 +35,8 @@ public class Noise3DGeneratorDialog : TerrainJobDialog
             .SetHorizontalSlider(new SliderValues<float>(0, 1, (float)settings.Ruggedness))
             .RegisterChange(ruggedness => settings.Ruggedness = ruggedness)
             .AddEndLabel(value => $"{value:F2}"));
+        Content.AddGamePanelToggle(loc.T(NormalizeKey), normalize => settings.Normalize = normalize)
+            .SetValueWithoutNotify(settings.Normalize);
         Content.Add(new GameSlider()
             .SetLabel(loc.T(BaseLevelKey))
             .SetHorizontalSlider(new SliderValues<float>(32, 80, (float)settings.BaseLevel))

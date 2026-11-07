@@ -14,6 +14,10 @@ public sealed class AutoencoderSettings
     // Gaussian blur on the enlarged map, in tiles
     public double BlurSigma = GaussianBlur.DefaultSigma;
 
+    // stretch the result so its lowest column becomes 0 and its highest 1; otherwise heights stay on the scale the
+    // encoder saw, where 1 is the current map's highest column
+    public bool Normalize = true;
+
     public AutoencoderSettings Clone()
     {
         return (AutoencoderSettings)MemberwiseClone();
@@ -80,7 +84,8 @@ public sealed class AutoencoderGenerator
         return decoder.Run(latent);
     }
 
-    // enlarges a decoded heightmap to the map (zoomed, a random part of it), blurs it and stretches it to 0..1
+    // enlarges a decoded heightmap to the map (zoomed, a random part of it), blurs it and, if normalizing, stretches it
+    // to 0..1
     public float[] Finish(float[] decoded, int sizeX, int sizeY, AutoencoderSettings settings, Random random,
         Action<float>? progress = null)
     {
@@ -101,6 +106,8 @@ public sealed class AutoencoderGenerator
         cropped = GaussianBlur.Apply(cropped, sizeX, sizeY, settings.BlurSigma);
         progress?.Invoke(0.9f);
 
+        if (!settings.Normalize)
+            return cropped;
         float min = cropped.Min(), range = Math.Max(1e-6f, cropped.Max() - min);
         var result = cropped.Select(height => (height - min) / range).ToArray();
         progress?.Invoke(1);

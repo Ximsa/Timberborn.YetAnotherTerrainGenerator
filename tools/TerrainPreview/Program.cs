@@ -8,7 +8,7 @@ using Timberborn.TerrainGenerator.Core.Wfc;
 using TerrainPreview;
 
 // Usage:
-//   TerrainPreview noise3d --size 128x128x23 --seed 1 [--hilliness 1] [--ruggedness 0.5] [--base 56] [--vscale 3]
+//   TerrainPreview noise3d --size 128x128x23 --seed 1 [--hilliness 1] [--ruggedness 0.5] [--normalize false] [--base 56] [--vscale 3]
 //       [--hscale 3] [--rivers 1] [--river-seed 1] --out preview.png   (--rivers works after any map-producing command)
 //   TerrainPreview wfc --sources a.timber,b.timber --size 64x64x23 --seed 1 [--n 3] [--symmetry true]
 //       [--periodic false] [--penalty 0.5] [--threshold 0.25] [--coverage 0.95] [--block 4] [--seeds 1-10]
@@ -42,7 +42,8 @@ switch (args[0])
             VerticalScale = double.Parse(options.GetValueOrDefault("vscale", "2")),
             HorizontalScale = double.Parse(options.GetValueOrDefault("hscale", "0")),
             Hilliness = double.Parse(options.GetValueOrDefault("hilliness", "1"), System.Globalization.CultureInfo.InvariantCulture),
-            Ruggedness = double.Parse(options.GetValueOrDefault("ruggedness", "0.5"), System.Globalization.CultureInfo.InvariantCulture)
+            Ruggedness = double.Parse(options.GetValueOrDefault("ruggedness", "0.5"), System.Globalization.CultureInfo.InvariantCulture),
+            Normalize = options.GetValueOrDefault("normalize", "false") == "true"
         };
         var generator = new Noise3DTerrainGenerator(settings, size.X, size.Y, size.Z);
         generator.ComputeDensity();

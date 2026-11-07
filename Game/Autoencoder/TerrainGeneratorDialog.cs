@@ -17,6 +17,7 @@ public class TerrainGeneratorDialog : TerrainJobDialog
     private const string GenerateKey = "Ximsa.TerrainGenerator.Generate";
     private const string ZoomFactorKey = "Ximsa.TerrainGenerator.ZoomFactor";
     private const string MaxHeightKey = "Ximsa.TerrainGenerator.MaxHeight";
+    private const string NormalizeKey = "Ximsa.TerrainGenerator.Normalize";
 
     private readonly VisualElement generateButton;
     private readonly AutoencoderSettings settings = new();
@@ -42,6 +43,9 @@ public class TerrainGeneratorDialog : TerrainJobDialog
             .SetHorizontalSlider(new SliderValues<float>(1, 8, settings.ZoomFactor))
             .RegisterChange(zoomFactor => settings.ZoomFactor = zoomFactor)
             .AddEndLabel(value => $"{value:G3}"));
+        Content.AddGamePanelToggle(loc.T(NormalizeKey), normalize => settings.Normalize = normalize)
+            .SetValueWithoutNotify(settings.Normalize);
+        // the height normalizing stretches to
         maxTerrainHeight = mapEditorService.MapSize.z;
         Content.Add(new GameSliderInt()
             .SetLabel($"{loc.T(MaxHeightKey)}")
@@ -63,18 +67,21 @@ public class TerrainGeneratorDialog : TerrainJobDialog
             var generator = progress.Stage(LoadingModelsKey, 0f, 0.05f,
                 _ => AutoencoderGenerator.Load(Path.Combine(ModStarter.OriginPath, "Models")));
             var random = new Random();
+            // the current map as solid voxels per column
+            var current = terrain.astype(np.float32).sum(0).flatten().ToArray<float>();
             var decoded = progress.Stage(DecodingKey, 0.05f, 0.15f, _ =>
             {
-                // the current map as solid voxels per column
-                var current = terrain.astype(np.float32).sum(0).flatten().ToArray<float>();
                 var latent = generator.Sample(generator.Encode(current, mapSize.x, mapSize.y), jobSettings, random);
                 return generator.Decode(latent);
             });
             var heights = progress.Stage(ScalingKey, 0.15f, 1f,
                 report => generator.Finish(decoded, mapSize.x, mapSize.y, jobSettings, random, report));
-            // stretch to the map's height
-            return VoxelMap.FromHeightmap(heights.Select(height => height * (maxHeight - 1f)).ToArray(), mapSize.x,
-                mapSize.y, mapSize.z);
+            // normalized: from the bottom layer (the only full one) to the maximum height; otherwise on the current
+            // map's scale, where 1 is its highest column
+            var columns = jobSettings.Normalize
+                ? heights.Select(height => 1 + height * (maxHeight - 1f))
+                : heights.Select(height => height * current.Max());
+            return VoxelMap.FromHeightmap(columns.ToArray(), mapSize.x, mapSize.y, mapSize.z);
         });
     }
 }
