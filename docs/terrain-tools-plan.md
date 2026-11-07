@@ -30,7 +30,7 @@ A second bottom-bar button group, **Terrain Tools**, built with the same group c
 | Entities | Terrain tools remove only entities on columns whose surface changed; the generators keep wiping everything |
 | Cliff Sharpening | Region-based plateaus: watershed regions on the smoothed height, each region flattened to its median height snapped to a step size |
 | River placement | Pick a random point, hill-climb to the top, put the river head a set number of tiles (default 4) before the top along the climb (until 2026-11-07: half way up in height) |
-| River course | Steepest descent from the head; a basin on the way fills up to its rim and the river flows on from there; a basin too big to fill is tunnelled through towards the nearest map edge. Ends at a map edge or another river |
+| River course | Steepest descent from the head; at a basin the water rises (over low rims too) until it holds the largest basin volume, then the river tunnels, winding, to the nearest map edge or lower ground. Ends at a map edge or another river |
 | River depth | A river lowers the terrain by at most 1 block anywhere |
 | River water | A water source entity at each river head |
 | Trees | Noise-driven forest patches mixing tree species, and separate noise-driven patches mixing bush species; trees and bushes never share a patch |
@@ -113,19 +113,21 @@ The terrain tools work on a heightmap, but must not destroy 3D terrain:
   terrace flats do not stall it) to a local top, and put the head on the climbed path a set number of tiles before
   the top (head distance, default 4). Of 50 random starts the one with the biggest climb wins (heads on small bumps
   gave rivers of a few tiles); heads within a sixth of the map from the edge, or near earlier heads, are skipped.
-- Course: from the head, follow steepest descent; at a pit or flat, flood lowest first (ties broken by distance, so
-  paths across flats are straight). If the water spills over the rim before the flooded area below the water level
-  reaches the largest basin to fill, the basin fills with water and the river continues from the spill point.
-  Otherwise the river tunnels from the pit straight towards the nearest map edge at its bed height, and continues in
-  the open from the first tile whose ground is at or below that height (or ends at the edge). Rivers end at a map
-  edge or on an earlier river.
+- Course: from the head, follow steepest descent; at a pit or flat the water rises lowest first (ties broken by
+  distance), spreading over low rims into neighbouring low ground, until the basin holds the largest basin volume
+  (voxels of water, default 500). Then the river tunnels out from the pit at its bed height to the nearest way out,
+  a map edge or ground at or below the bed, whichever the cheapest path reaches first (both count equally); each tile
+  costs e^(8 * (noise - 0.5)) for a smooth random noise, so tunnels wind along the noise's low valleys. The river
+  continues in the open where the tunnel comes out (or ends at the edge). If the rising water reaches a map edge or
+  an earlier river first, the river drains there. Rivers end at a map edge or on an earlier river.
 - Carve: **river beds at most 1 block below the original terrain**: the bed follows a line that never rises from head
   to mouth where the 1-block limit allows, across the width setting. Filled basins are not dug, the water fills them
   as Timberborn water does. Tunnels are the exception: a passage of 2 voxels at bed height is cleared under the
   ground (keeping at least one block of roof); where the ground is too thin for a roof it is cut open to the bed.
 - Place a water source at the head; where the game does not accept it there (terrain or objects in its footprint, no
   ground below, e.g. on a slope near the peak), at the first tile downstream (outside tunnels) where it fits.
-- Settings: number of rivers, width, head distance (0..16, default 4), largest basin to fill (20..1000 tiles, default
+- Settings: number of rivers (1..4, default 1), width, head distance (0..16, default 4), largest basin volume
+  (50..5000 voxels of water, default
   500), water source strength. One progress stage.
 - Offline preview: `TerrainPreview rivers <file.timber> [--head 4] [--basin 500]`, or `--rivers N` after any
   map-producing command (e.g. `noise3d`). Water is drawn blue, tunnels purple, heads red.

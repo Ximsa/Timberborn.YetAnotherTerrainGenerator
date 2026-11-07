@@ -4,7 +4,7 @@ namespace Timberborn.TerrainGenerator.Core.Rivers;
 
 public sealed class RiverCarverSettings
 {
-    public int Rivers = 3;
+    public int Rivers = 1;
 
     // bed width in tiles
     public int Width = 3;
@@ -12,9 +12,9 @@ public sealed class RiverCarverSettings
     // the head sits this many tiles before the peak, along the climb from the random start
     public int HeadDistance = 4;
 
-    // basins up to this many tiles below their rim are filled and the river flows on over the rim; larger ones are
-    // tunnelled through towards the nearest map edge
-    public int MaxBasinArea = 500;
+    // a basin fills with water (rising past low rims into neighbouring low ground) until it holds this many voxels of
+    // water; then the river tunnels out towards the nearest map edge or lower ground
+    public int MaxBasinVolume = 500;
 
     // strength of the water source at each river head
     public float SourceStrength = 1.5f;
@@ -31,11 +31,11 @@ public sealed class RiverCarverSettings
 public readonly record struct RiverHead(int X, int Y, int Z);
 
 // Carves rivers into a surface. Each river starts at a random tile, climbs to the nearest top, and has its head a
-// few tiles before the peak. From the head it runs down the steepest descent. At a pit it floods the basin lowest first:
-// the water fills it up to the rim, and the river flows on from where it spills over. A basin too big to fill is
-// tunnelled through instead, straight towards the nearest map edge, until the tunnel comes out into the open. A river
-// ends at a map edge or where it joins an earlier river. River beds lower the terrain by at most one block; only
-// tunnels cut deeper.
+// few tiles before the peak. From the head it runs down the steepest descent. At a pit the water rises, spreading over
+// low rims into neighbouring low ground, until the basin holds the largest volume; then the river tunnels out,
+// winding towards the nearest way out (a map edge or lower ground, whichever is closer). Rising water that reaches a
+// map edge or another river drains there instead. A river ends at a map edge or where it joins an earlier river.
+// River beds lower the terrain by at most one block; only tunnels cut deeper.
 public sealed class RiverCarver
 {
     // height in voxels of a tunnel's passage
@@ -46,6 +46,10 @@ public sealed class RiverCarver
 
     private const int HeadAttempts = 50;
 
+    // contrast of the tunnel cost: a tile costs e^(TunnelWinding * (noise - 0.5)), so tunnels follow the noise's low
+    // valleys; higher values make them wind more
+    private const float TunnelWinding = 8;
+
     // a river bed lowers the terrain by at most this many blocks (bed and width); tunnels are the exception
     private const int MaxCut = 1;
 
@@ -53,6 +57,7 @@ public sealed class RiverCarver
     private readonly int sizeX;
     private readonly int sizeY;
     private readonly List<(int X, int Y, int Z)> tunnels = new();
+    private float[] tunnelNoise = Array.Empty<float>();
 
     public RiverCarver(RiverCarverSettings settings, int sizeX, int sizeY)
     {
@@ -87,6 +92,7 @@ public sealed class RiverCarver
         // tiles on an earlier river's course; a later river that reaches one joins it
         var courses = new bool[heights.Length];
         var climbSurface = Smooth(heights);
+        tunnelNoise = SmoothNoise(random, 3);
         for (var river = 0; river < settings.Rivers; river++)
         {
             var head = FindHead(random, result, climbSurface);
@@ -205,17 +211,21 @@ public sealed class RiverCarver
                 continue;
             }
 
-            // a pit or a flat: fill the basin up to its rim and flow on from there, or tunnel out if it is too big
-            var (spillPath, basin) = Flood(tile, heights, onCourse, courses);
-            if (spillPath != null)
+            // a pit or a flat: the water rises until the basin holds the largest volume, then tunnels out, unless it
+            // reaches a map edge or another river first
+            var (drainPath, basin) = Flood(tile, heights, onCourse, courses);
+            basins.AddRange(basin);
+            if (drainPath != null)
             {
-                basins.AddRange(basin);
-                foreach (var step in spillPath) Add(step);
+                foreach (var step in drainPath) Add(step);
             }
             else
             {
                 var floor = heights[tile] - MaxCut;
-                foreach (var step in Tunnel(tile, floor, heights))
+                var tunnel = Tunnel(tile, floor, heights, onCourse);
+                // no way out at all (the river's own course walls it in): the river ends in this basin
+                if (tunnel.Count == 0) break;
+                foreach (var step in tunnel)
                 {
                     Add(step);
                     if (heights[step] > floor)
@@ -239,10 +249,10 @@ public sealed class RiverCarver
         }
     }
 
-    // floods from start lowest first. Returns the path to the first tile past the rim (or at an edge or on another
-    // river) and the basin's tiles below the water level, or no path when the basin's area below the water level
-    // reaches the largest basin to fill
-    private (List<int>? SpillPath, List<int> Basin) Flood(int start, int[] heights, HashSet<int> onCourse,
+    // floods from start lowest first: the water keeps rising, spreading over low rims into neighbouring low ground,
+    // until it holds the largest basin volume. Returns the path to where it drains if it reaches a map edge or another
+    // river first, and the tiles under water; no path means the basin is full and the river has to tunnel out
+    private (List<int>? DrainPath, List<int> Basin) Flood(int start, int[] heights, HashSet<int> onCourse,
         bool[] courses)
     {
         var parent = new Dictionary<int, int> { [start] = start };
@@ -251,19 +261,29 @@ public sealed class RiverCarver
         var queue = new TileQueue();
         queue.Push(start, Priority(heights[start], 0));
         var level = heights[start];
-        // flooded tiles per height, to count the area below the water level
-        var flooded = new SortedDictionary<int, int>();
-        var visited = new List<int>();
+        var flooded = new List<int>();
+        // voxels of water: the depth below the level, summed over the flooded tiles
+        long volume = 0;
         while (queue.TryPop(out var tile, out _))
         {
             var height = heights[tile];
-            if (height < level || (tile != start && (IsEdge(tile) || courses[tile])))
-                return (PathTo(tile, parent), visited.Where(t => heights[t] < level).ToList());
-            level = height;
-            visited.Add(tile);
-            flooded[height] = flooded.TryGetValue(height, out var count) ? count + 1 : 1;
-            if (flooded.Where(entry => entry.Key < level).Sum(entry => entry.Value) >= settings.MaxBasinArea)
-                return (null, new List<int>());
+            if (tile != start && (IsEdge(tile) || courses[tile]))
+                return (PathTo(tile, parent), Underwater());
+            if (height > level)
+            {
+                // rising to the next tile's height deepens the water on every flooded tile
+                volume += (long)flooded.Count * (height - level);
+                level = height;
+            }
+            else
+            {
+                // lower ground beyond a rim fills up to the level
+                volume += level - height;
+            }
+
+            flooded.Add(tile);
+            if (volume >= settings.MaxBasinVolume)
+                return (null, Underwater());
             foreach (var neighbour in NeighboursOf(tile))
                 if (!parent.ContainsKey(neighbour) && !onCourse.Contains(neighbour))
                 {
@@ -273,29 +293,76 @@ public sealed class RiverCarver
                 }
         }
 
-        // nowhere to spill: tunnel out
-        return (null, new List<int>());
+        // nowhere left to flood: tunnel out
+        return (null, Underwater());
+
+        List<int> Underwater()
+        {
+            return flooded.Where(t => heights[t] < level).ToList();
+        }
     }
 
-    // tiles from start straight towards the nearest map edge, at floor height: up to and including the first tile
-    // whose ground is at or below the floor (the tunnel comes out there), or to the map edge
-    private List<int> Tunnel(int start, int floor, int[] heights)
+    // the tunnel's tiles from start (excluded) to the nearest way out: a map edge tile or a tile whose ground is at or
+    // below the floor (the tunnel comes out there), whichever the cheapest path reaches first, so both count equally.
+    // Each tile costs 1 plus a smooth random amount, which makes the tunnel wind instead of running straight
+    private List<int> Tunnel(int start, int floor, int[] heights, HashSet<int> onCourse)
     {
-        int x = start % sizeX, y = start / sizeX;
-        var (dx, dy) = new[] { (x, (-1, 0)), (sizeX - 1 - x, (1, 0)), (y, (0, -1)), (sizeY - 1 - y, (0, 1)) }
-            .OrderBy(edge => edge.Item1).First().Item2;
-        var path = new List<int>();
-        while (true)
+        var parent = new Dictionary<int, int> { [start] = start };
+        var cost = new Dictionary<int, float> { [start] = 0 };
+        var queue = new TileQueue();
+        queue.Push(start, 0);
+        while (queue.TryPop(out var tile, out var tileCost))
         {
-            x += dx;
-            y += dy;
-            if (x < 0 || y < 0 || x >= sizeX || y >= sizeY) break;
-            var tile = y * sizeX + x;
-            path.Add(tile);
-            if (heights[tile] <= floor || IsEdge(tile)) break;
+            if (tileCost > cost[tile]) continue;
+            if (tile != start && (heights[tile] <= floor || IsEdge(tile)))
+                return PathTo(tile, parent);
+            int x = tile % sizeX, y = tile / sizeX;
+            foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+            {
+                int nx = x + dx, ny = y + dy;
+                if (nx < 0 || ny < 0 || nx >= sizeX || ny >= sizeY) continue;
+                var neighbour = ny * sizeX + nx;
+                if (onCourse.Contains(neighbour)) continue;
+                var neighbourCost = tileCost + (float)Math.Exp(TunnelWinding * (tunnelNoise[neighbour] - 0.5));
+                if (cost.TryGetValue(neighbour, out var known) && known <= neighbourCost) continue;
+                cost[neighbour] = neighbourCost;
+                parent[neighbour] = tile;
+                queue.Push(neighbour, neighbourCost);
+            }
         }
 
-        return path;
+        return new List<int>();
+    }
+
+    // smooth random values in 0..1, one per tile: blurred white noise, stretched to the full range
+    private float[] SmoothNoise(Random random, int radius)
+    {
+        var values = Enumerable.Range(0, sizeX * sizeY).Select(_ => (float)random.NextDouble()).ToArray();
+        for (var pass = 0; pass < 2; pass++)
+        {
+            var blurred = new float[values.Length];
+            for (var y = 0; y < sizeY; y++)
+            for (var x = 0; x < sizeX; x++)
+            {
+                float sum = 0;
+                var count = 0;
+                for (var dy = -radius; dy <= radius; dy++)
+                for (var dx = -radius; dx <= radius; dx++)
+                {
+                    int nx = x + dx, ny = y + dy;
+                    if (nx < 0 || ny < 0 || nx >= sizeX || ny >= sizeY) continue;
+                    sum += values[ny * sizeX + nx];
+                    count++;
+                }
+
+                blurred[y * sizeX + x] = sum / count;
+            }
+
+            values = blurred;
+        }
+
+        float min = values.Min(), range = Math.Max(1e-6f, values.Max() - min);
+        return values.Select(value => (value - min) / range).ToArray();
     }
 
     private static float Priority(int height, int steps)

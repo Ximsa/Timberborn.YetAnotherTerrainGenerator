@@ -88,7 +88,7 @@ TerrainJobDialog.RunJob ◀─────────────────�
 | Wfc | `WfcTerrainGenerator`: learn 3D patterns from maps (`WfcPatternSet`), solve with backtracking (`WfcSolver`, selectable cell order) | `WfcGeneratorDialog`: map checklist (`MapRepository`), cell selection dropdown |
 | Smoothing | `MedianBlur` on the surface | `TerrainFilterDialog` |
 | CliffSharpening | `CliffSharpener`: watershed on slope, height bands, small-region merging, median plateaus, minimum cliff merging | `CliffSharpeningDialog` |
-| Rivers | `RiverCarver`: heads a few tiles below a climbed peak, steepest descent, basins filled up to their rim, tunnels (3D) towards the nearest edge through basins too big to fill, beds at most one block deep | `RiverCarverDialog`: tunnels carved into the voxels, water sources at heads (`EntityPlacer`) |
+| Rivers | `RiverCarver`: heads a few tiles below a climbed peak, steepest descent, basins filled up to a water volume, winding tunnels (3D) to the nearest edge or lower ground, beds at most one block deep | `RiverCarverDialog`: tunnels carved into the voxels, water sources at heads (`EntityPlacer`) |
 | Trees | `TreePlacer`: noise patches, species clumps, density near water | `TreePlacementDialog`: species from the game, water from `IThreadSafeWaterMap`, spawning (`EntityPlacer`) |
 
 ## Build and deploy

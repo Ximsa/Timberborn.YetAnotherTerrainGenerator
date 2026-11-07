@@ -14,7 +14,7 @@ public class RiverCarverDialog : TerrainJobDialog
     private const string RiversKey = "Ximsa.TerrainGenerator.RiverCarver.Rivers";
     private const string WidthKey = "Ximsa.TerrainGenerator.RiverCarver.Width";
     private const string HeadDistanceKey = "Ximsa.TerrainGenerator.RiverCarver.HeadDistance";
-    private const string MaxBasinAreaKey = "Ximsa.TerrainGenerator.RiverCarver.MaxBasinArea";
+    private const string MaxBasinVolumeKey = "Ximsa.TerrainGenerator.RiverCarver.MaxBasinVolume";
     private const string SourceStrengthKey = "Ximsa.TerrainGenerator.RiverCarver.SourceStrength";
     private const string ApplyKey = "Ximsa.TerrainGenerator.Apply";
     private const string CarvingKey = "Ximsa.TerrainGenerator.Progress.Carving";
@@ -30,7 +30,7 @@ public class RiverCarverDialog : TerrainJobDialog
         SetTitle(loc.T(TitleKey));
         Content.Add(new GameSliderInt()
             .SetLabel(loc.T(RiversKey))
-            .SetHorizontalSlider(new SliderValues<int>(1, 10, settings.Rivers))
+            .SetHorizontalSlider(new SliderValues<int>(1, 4, settings.Rivers))
             .RegisterChange(rivers => settings.Rivers = rivers)
             .AddEndLabel(value => $"{value}"));
         Content.Add(new GameSliderInt()
@@ -44,9 +44,9 @@ public class RiverCarverDialog : TerrainJobDialog
             .RegisterChange(headDistance => settings.HeadDistance = headDistance)
             .AddEndLabel(value => $"{value}"));
         Content.Add(new GameSliderInt()
-            .SetLabel(loc.T(MaxBasinAreaKey))
-            .SetHorizontalSlider(new SliderValues<int>(20, 1000, settings.MaxBasinArea))
-            .RegisterChange(maxBasinArea => settings.MaxBasinArea = maxBasinArea)
+            .SetLabel(loc.T(MaxBasinVolumeKey))
+            .SetHorizontalSlider(new SliderValues<int>(50, 5000, settings.MaxBasinVolume))
+            .RegisterChange(maxBasinVolume => settings.MaxBasinVolume = maxBasinVolume)
             .AddEndLabel(value => $"{value}"));
         Content.Add(new GameSlider()
             .SetLabel(loc.T(SourceStrengthKey))

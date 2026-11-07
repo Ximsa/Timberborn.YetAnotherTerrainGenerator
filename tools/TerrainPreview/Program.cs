@@ -196,7 +196,7 @@ switch (args[0])
             Rivers = int.Parse(options.GetValueOrDefault("rivers", args[0] == "rivers" ? "3" : "0")),
             Width = int.Parse(options.GetValueOrDefault("width", "3")),
             HeadDistance = int.Parse(options.GetValueOrDefault("head", "4")),
-            MaxBasinArea = int.Parse(options.GetValueOrDefault("basin", "500")),
+            MaxBasinVolume = int.Parse(options.GetValueOrDefault("basin", "500")),
             Seed = seed
         };
         var carver = new RiverCarver(riverSettings, before.SizeX, before.SizeY);

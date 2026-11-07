@@ -19,7 +19,7 @@ clicks instead of hours of brushing.
 | Generate | WFC Generator | Terrain assembled from 3D patterns learned from chosen maps (the current one, built-in ones, the user's own) |
 | Shape | Terrain Smoothing | Calms rough terrain |
 | Shape | Cliff Sharpening | Splits terrain into flat plateaus with cliffs between them, so buildings fit |
-| Shape | River Carver | Rivers from a few tiles below hilltops down to the map edge, filling basins on the way and tunnelling through hills where a basin is too big, with a water source at each head |
+| Shape | River Carver | Rivers from a few tiles below hilltops down to the map edge, filling basins on the way up to a set volume and tunnelling out of full ones, with a water source at each head |
 | Shape | Tree Placement | Forests and bush patches, denser near water, off cliff edges |
 
 ## Principles
