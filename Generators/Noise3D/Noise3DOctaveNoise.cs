@@ -1,7 +1,6 @@
 namespace Timberborn.TerrainGenerator.Generators.Noise3D;
 
-// Octave noise for the 3D Noise generator (based on Minecraft beta 1.7.3's NoiseGeneratorOctaves): each octave
-// doubles the frequency and halves the amplitude.
+// Octave noise for the 3D Noise generator: each octave doubles the frequency and halves the amplitude.
 internal sealed class Noise3DOctaveNoise
 {
     private readonly Noise3DPerlinNoise[] octaves;

@@ -1,8 +1,7 @@
 namespace Timberborn.TerrainGenerator.Generators.Noise3D;
 
-// Improved Perlin noise for the 3D Noise generator (based on Minecraft beta 1.7.3's NoiseGeneratorPerlin), seeded from
-// System.Random.
-// Values are added into a flat array indexed (x * sizeZ + z) * sizeY + y, like the original.
+// Improved Perlin noise for the 3D Noise generator, seeded from System.Random.
+// Values are added into a flat array indexed (x * sizeZ + z) * sizeY + y.
 internal sealed class Noise3DPerlinNoise
 {
     private readonly int[] permutations = new int[512];

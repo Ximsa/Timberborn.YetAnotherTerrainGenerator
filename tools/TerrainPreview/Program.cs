@@ -6,7 +6,7 @@ using Timberborn.TerrainGenerator.TerrainTools;
 using TerrainPreview;
 
 // Usage:
-//   TerrainPreview noise3d --size 128x128x23 --seed 1 [--climate rainforest|varyingbiomes] [--base 56] [--vscale 3]
+//   TerrainPreview noise3d --size 128x128x23 --seed 1 [--temperature 1] [--humidity 1] [--base 56] [--vscale 3]
 //       [--hscale 3] [--rivers 1] [--river-seed 1] --out preview.png   (--rivers works after any map-producing command)
 //   TerrainPreview wfc --sources a.timber,b.timber --size 64x64x23 --seed 1 [--n 3] [--symmetry true]
 //       [--periodic false] [--penalty 0.5] [--threshold 0.25] [--coverage 0.95] [--block 4] [--seeds 1-10] --out preview.png
@@ -38,11 +38,10 @@ switch (args[0])
             BaseLevel = double.Parse(options.GetValueOrDefault("base", "56")),
             VerticalScale = double.Parse(options.GetValueOrDefault("vscale", "2")),
             HorizontalScale = double.Parse(options.GetValueOrDefault("hscale", "0")),
-            Climate = Enum.Parse<Noise3DClimate>(options.GetValueOrDefault("climate", "Rainforest"), true)
+            Temperature = double.Parse(options.GetValueOrDefault("temperature", "1"), System.Globalization.CultureInfo.InvariantCulture),
+            Humidity = double.Parse(options.GetValueOrDefault("humidity", "1"), System.Globalization.CultureInfo.InvariantCulture)
         };
         var generator = new Noise3DTerrainGenerator(settings, size.X, size.Y, size.Z);
-        generator.ComputeClimate();
-        Console.WriteLine($"climate: {stopwatch.ElapsedMilliseconds} ms");
         generator.ComputeDensity();
         Console.WriteLine($"density: {stopwatch.ElapsedMilliseconds} ms");
         map = generator.BuildVoxels();
