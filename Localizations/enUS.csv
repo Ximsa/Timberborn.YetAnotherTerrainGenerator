@@ -2,7 +2,6 @@ ID,Text,Comment
 Ximsa.TerrainGenerator.Title,"Terrain Generator",-
 Ximsa.TerrainGenerator.Encoder,"Keep current map",-
 Ximsa.TerrainGenerator.FilterTitle,"Filter Tool",-
-Ximsa.TerrainGenerator.UseGaussFilterToggle,"Use Gaussian Filter instead of Median Filter",-
 Ximsa.TerrainGenerator.Generate,"Generate Terrain",-
 Ximsa.TerrainGenerator.Passes,"Number of Filter Passes",-
 Ximsa.TerrainGenerator.Radius,"Radius of the Filter",-
