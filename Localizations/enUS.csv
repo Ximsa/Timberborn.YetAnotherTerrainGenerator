@@ -59,3 +59,10 @@ Ximsa.TerrainGenerator.Progress.ReadingMaps,"Reading maps",-
 Ximsa.TerrainGenerator.Progress.Learning,"Learning patterns",-
 Ximsa.TerrainGenerator.Progress.Solving,"Solving",-
 Ximsa.TerrainGenerator.Group.Tools,"Terrain Tools",-
+Ximsa.TerrainGenerator.Tool.CliffSharpening,"Cliff Sharpening",-
+Ximsa.TerrainGenerator.Tool.CliffSharpening.Description,"Splits the terrain into flat plateaus with cliffs between them, for easier building. Overhangs below the surface are kept.",-
+Ximsa.TerrainGenerator.CliffSharpening.RegionSize,"Region size (smoothing before splitting)",-
+Ximsa.TerrainGenerator.CliffSharpening.MinRegionArea,"Smallest plateau (tiles)",-
+Ximsa.TerrainGenerator.CliffSharpening.StepSize,"Height step between plateaus",-
+Ximsa.TerrainGenerator.CliffSharpening.Strength,"Strength",-
+Ximsa.TerrainGenerator.Progress.Sharpening,"Sharpening cliffs",-

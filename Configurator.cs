@@ -34,6 +34,7 @@ public class MapEditorConfigurator : Configurator
         MultiBind<BottomBarModule>().ToProvider<BottomBarModuleProvider<TerrainGeneratorGroupButton>>().AsSingleton();
 
         Bind<TerrainSmoothingTool>().AsSingleton();
+        Bind<CliffSharpeningTool>().AsSingleton();
         Bind<TerrainToolsGroupButton>().AsSingleton();
         MultiBind<BottomBarModule>().ToProvider<BottomBarModuleProvider<TerrainToolsGroupButton>>().AsSingleton();
     }

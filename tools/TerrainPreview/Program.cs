@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Timberborn.TerrainGenerator;
 using Timberborn.TerrainGenerator.Generators.Noise3D;
 using Timberborn.TerrainGenerator.Generators.Wfc;
+using Timberborn.TerrainGenerator.TerrainTools;
 using TerrainPreview;
 
 // Usage:
@@ -11,6 +12,7 @@ using TerrainPreview;
 //       [--periodic false] [--penalty 0.5] [--threshold 0.25] [--coverage 0.95] [--block 4] [--seeds 1-10] --out preview.png
 //   TerrainPreview threshold-sweep --sources a.timber,b.timber [--size 128x128x23] [--seed 1] [--start 0] --out-dir <dir>
 //   TerrainPreview map <file.timber> --out preview.png
+//   TerrainPreview sharpen <file.timber> [--region 4] [--min-area 48] [--step 2] [--strength 1] --out preview.png
 if (args.Length == 0)
 {
     Console.WriteLine("usage: TerrainPreview noise3d|map ... --out <file.png>");
@@ -145,6 +147,30 @@ switch (args[0])
         using var file = File.OpenRead(args[1]);
         map = MapVoxelReader.Read(file);
         break;
+    }
+    case "sharpen":
+    {
+        // the map before and after cliff sharpening, side by side
+        using var file = File.OpenRead(args[1]);
+        var before = MapVoxelReader.Read(file);
+        var settings = new CliffSharpenerSettings
+        {
+            RegionSize = int.Parse(options.GetValueOrDefault("region", "4")),
+            MinRegionArea = int.Parse(options.GetValueOrDefault("min-area", "48")),
+            StepSize = int.Parse(options.GetValueOrDefault("step", "2")),
+            Strength = double.Parse(options.GetValueOrDefault("strength", "1"), System.Globalization.CultureInfo.InvariantCulture)
+        };
+        var sharpener = new CliffSharpener(settings, before.SizeX, before.SizeY);
+        var after = Surface.WithHeights(before, sharpener.Sharpen(Surface.Heights(before)));
+        Console.WriteLine($"sharpened into {sharpener.RegionCount} regions in {stopwatch.ElapsedMilliseconds} ms");
+        PrintStats(before);
+        PrintStats(after);
+        Sheet(new List<(string, Image)>
+        {
+            ("before", VoxelRenderer.Render(before)), ("after", VoxelRenderer.Render(after))
+        }).SavePng(output);
+        Console.WriteLine($"wrote {output}");
+        return 0;
     }
     default:
         Console.WriteLine($"unknown generator {args[0]}");

@@ -16,7 +16,7 @@ A second bottom-bar button group, **Terrain Tools**, built with the same group c
 |---|---|
 | 0 Spikes | API found in game code (see findings); not yet confirmed in game |
 | 1 Group, smoothing, surface editing | Built; not yet tested in game |
-| 2 Cliff Sharpening | Not started |
+| 2 Cliff Sharpening | Built and previewed offline; not yet tested in game |
 | 3 River Carver | Not started |
 | 4 Tree Placement | Not started |
 | 5 Polish and release | Not started |
@@ -87,15 +87,20 @@ The terrain tools work on a heightmap, but must not destroy 3D terrain:
 ### Phase 2: Cliff Sharpening
 
 - Smooth the surface heightmap (Gaussian, radius from the region size setting).
-- Watershed segmentation of the smoothed height (priority flood from local minima); merge regions smaller than the
-  minimum region area into their neighbour with the closest height.
-- Each region gets the median of its original surface heights, snapped to the step size.
-- Optional ramps: between neighbouring regions one step apart, a ramp chance setting turns a short stretch of their
-  border into a slope one tile per tile, so plateaus stay reachable.
-- Settings: region size, minimum region area, step size (default 2), ramp chance, strength (blend between original
-  and plateau height, default full).
-- Progress stages: smoothing, segmenting, flattening.
-- Offline preview in `tools/TerrainPreview`.
+- Watershed segmentation of the smoothed surface's slope (priority flood from the slope's local minima), so region
+  borders run along the steepest ground.
+- Each watershed region is split into connected bands one step of height apart (on a lightly smoothed surface):
+  a long even slope has no slope minima inside it, and without this it ended up flattened into the regions above
+  and below; with it, slopes become stacked terraces and narrow ridges keep their height.
+- Regions smaller than the minimum region area merge into the neighbour with the closest mean height, but only when
+  that neighbour is less than one step away (real small peaks and pits stay, specks under a quarter of the minimum
+  area always merge).
+- Each region gets the median of its original surface heights, snapped to the step size (halves round up).
+- No ramps: beavers need stairs for any terrain step anyway.
+- Settings: region size, minimum region area, step size (default 2), strength (blend between original and plateau
+  height, default full). One progress stage.
+- Offline preview: `TerrainPreview sharpen <file.timber>`. On ThousandIslands (256 x 256) it takes about 0.7 s and
+  keeps every height level (e.g. tiles at 16 stay 16, at 12 stay 12 on average).
 
 ### Phase 3: River Carver
 
