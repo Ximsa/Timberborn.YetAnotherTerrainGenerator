@@ -16,7 +16,7 @@ using TerrainPreview;
 //   TerrainPreview threshold-sweep --sources a.timber,b.timber [--size 128x128x23] [--seed 1] [--start 0] --out-dir <dir>
 //   TerrainPreview map <file.timber> --out preview.png
 //   TerrainPreview sharpen <file.timber> [--region 4] [--min-area 32] [--step 2] [--strength 0.5] --out preview.png
-//   TerrainPreview rivers <file.timber> [--rivers 3] [--width 3] [--lake 150] [--seed 1] [--sharpen false]
+//   TerrainPreview rivers <file.timber> [--rivers 3] [--width 3] [--head 4] [--basin 150] [--seed 1] [--sharpen false]
 //       --out preview.png
 //   TerrainPreview trees <file.timber> [--rivers 0] [--forest 0.35] [--bush 0.12] [--patch 32] [--clump 6]
 //       [--density 0.5] [--seed 1] [--sharpen false] --out preview.png
@@ -195,19 +195,24 @@ switch (args[0])
         {
             Rivers = int.Parse(options.GetValueOrDefault("rivers", args[0] == "rivers" ? "3" : "0")),
             Width = int.Parse(options.GetValueOrDefault("width", "3")),
-            LakeSize = int.Parse(options.GetValueOrDefault("lake", "150")),
+            HeadDistance = int.Parse(options.GetValueOrDefault("head", "4")),
+            MaxBasinArea = int.Parse(options.GetValueOrDefault("basin", "150")),
             Seed = seed
         };
         var carver = new RiverCarver(riverSettings, before.SizeX, before.SizeY);
         heights = carver.Carve(heights);
-        Console.WriteLine($"carved {carver.Heads.Count} rivers ({carver.Water.Count(w => w)} water tiles) in " +
+        Console.WriteLine($"carved {carver.Heads.Count} rivers ({carver.Water.Count(w => w)} water tiles, " +
+                          $"{carver.Tunnels.Count} tunnel columns) in " +
                           $"{stopwatch.ElapsedMilliseconds} ms; heads at " +
                           string.Join(", ", carver.Heads.Select(h => $"({h.X}, {h.Y}, z {h.Z})")));
         var after = Surface.WithHeights(before, heights);
+        carver.CarveTunnels(after);
         var colors = new Dictionary<(int, int), Rgb>();
         for (var i = 0; i < carver.Water.Length; i++)
             if (carver.Water[i])
                 colors[(i % before.SizeX, i / before.SizeX)] = new Rgb(60, 120, 220);
+        foreach (var (x, y, _) in carver.Tunnels)
+            colors[(x, y)] = new Rgb(150, 60, 200);
         if (args[0] == "trees")
         {
             var treeSettings = new TreePlacerSettings
@@ -266,12 +271,17 @@ if (options.TryGetValue("rivers", out var riverCount))
         Seed = int.Parse(options.GetValueOrDefault("river-seed", options.GetValueOrDefault("seed", "1")))
     }, map.SizeX, map.SizeY);
     map = Surface.WithHeights(map, carver.Carve(Surface.Heights(map)));
-    Console.WriteLine($"carved {carver.Heads.Count} river(s), {carver.Water.Count(w => w)} water tiles, heads at " +
+    carver.CarveTunnels(map);
+    Console.WriteLine($"carved {carver.Heads.Count} river(s), {carver.Water.Count(w => w)} water tiles, " +
+                      $"{carver.Tunnels.Count} tunnel columns, heads at " +
                       string.Join(", ", carver.Heads.Select(h => $"({h.X}, {h.Y}, z {h.Z})")));
     var heads = carver.Heads.Select(h => (h.X, h.Y)).ToHashSet();
+    var tunnels = carver.Tunnels.Select(t => (t.X, t.Y)).ToHashSet();
     var water = carver.Water;
     var width = map.SizeX;
+    // heads red, tunnels purple, open water blue
     overlay = (x, y) => heads.Contains((x, y)) ? new Rgb(230, 40, 40)
+        : tunnels.Contains((x, y)) ? new Rgb(150, 60, 200)
         : water[y * width + x] ? new Rgb(60, 120, 220) : null;
 }
 

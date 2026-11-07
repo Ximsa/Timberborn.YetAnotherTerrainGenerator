@@ -12,7 +12,8 @@ public class RiverCarverDialog : TerrainJobDialog
     private const string TitleKey = "Ximsa.TerrainGenerator.Tool.RiverCarver";
     private const string RiversKey = "Ximsa.TerrainGenerator.RiverCarver.Rivers";
     private const string WidthKey = "Ximsa.TerrainGenerator.RiverCarver.Width";
-    private const string LakeSizeKey = "Ximsa.TerrainGenerator.RiverCarver.LakeSize";
+    private const string HeadDistanceKey = "Ximsa.TerrainGenerator.RiverCarver.HeadDistance";
+    private const string MaxBasinAreaKey = "Ximsa.TerrainGenerator.RiverCarver.MaxBasinArea";
     private const string SourceStrengthKey = "Ximsa.TerrainGenerator.RiverCarver.SourceStrength";
     private const string ApplyKey = "Ximsa.TerrainGenerator.Apply";
     private const string CarvingKey = "Ximsa.TerrainGenerator.Progress.Carving";
@@ -37,9 +38,14 @@ public class RiverCarverDialog : TerrainJobDialog
             .RegisterChange(width => settings.Width = width)
             .AddEndLabel(value => $"{value}"));
         Content.Add(new GameSliderInt()
-            .SetLabel(loc.T(LakeSizeKey))
-            .SetHorizontalSlider(new SliderValues<int>(20, 1000, settings.LakeSize))
-            .RegisterChange(lakeSize => settings.LakeSize = lakeSize)
+            .SetLabel(loc.T(HeadDistanceKey))
+            .SetHorizontalSlider(new SliderValues<int>(0, 16, settings.HeadDistance))
+            .RegisterChange(headDistance => settings.HeadDistance = headDistance)
+            .AddEndLabel(value => $"{value}"));
+        Content.Add(new GameSliderInt()
+            .SetLabel(loc.T(MaxBasinAreaKey))
+            .SetHorizontalSlider(new SliderValues<int>(20, 1000, settings.MaxBasinArea))
+            .RegisterChange(maxBasinArea => settings.MaxBasinArea = maxBasinArea)
             .AddEndLabel(value => $"{value}"));
         Content.Add(new GameSlider()
             .SetLabel(loc.T(SourceStrengthKey))
@@ -63,7 +69,9 @@ public class RiverCarverDialog : TerrainJobDialog
             var carver = new RiverCarver(jobSettings, mapSize.x, mapSize.y);
             var heights = progress.Stage(CarvingKey, 0, 1, report => carver.Carve(Surface.Heights(voxels), report));
             heads = carver.Heads;
-            return Surface.WithHeights(voxels, heights);
+            var carved = Surface.WithHeights(voxels, heights);
+            carver.CarveTunnels(carved);
+            return carved;
         }, removeAllEntities: false, placeEntities: () => PlaceWaterSources(heads, jobSettings.SourceStrength));
     }
 

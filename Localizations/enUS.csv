@@ -60,10 +60,11 @@ Ximsa.TerrainGenerator.Progress.Sharpening,"Sharpening cliffs",-
 Ximsa.TerrainGenerator.Variety,"Variety (in spreads of the built-in maps)",-
 Ximsa.TerrainGenerator.Progress.Placing,"Placing",-
 Ximsa.TerrainGenerator.Tool.RiverCarver,"River Carver",-
-Ximsa.TerrainGenerator.Tool.RiverCarver.Description,"Carves rivers that start half way up a hill and run downhill to the map edge or a lake, with a water source at each head. Lowers the terrain by at most one block.",-
+Ximsa.TerrainGenerator.Tool.RiverCarver.Description,"Carves rivers that start a few tiles below a hilltop, fill the basins on their way and run downhill to the map edge, tunnelling through hills where a basin is too big to fill. A water source is placed at each head. River beds lower the terrain by at most one block.",-
 Ximsa.TerrainGenerator.RiverCarver.Rivers,"Number of rivers",-
 Ximsa.TerrainGenerator.RiverCarver.Width,"River width (tiles)",-
-Ximsa.TerrainGenerator.RiverCarver.LakeSize,"Lake size (a basin this big ends a river)",-
+Ximsa.TerrainGenerator.RiverCarver.MaxBasinArea,"Largest basin to fill (tiles); bigger ones are tunnelled through",-
+Ximsa.TerrainGenerator.RiverCarver.HeadDistance,"River head: tiles before the peak",-
 Ximsa.TerrainGenerator.RiverCarver.SourceStrength,"Water source strength",-
 Ximsa.TerrainGenerator.Progress.Carving,"Carving rivers",-
 Ximsa.TerrainGenerator.Tool.TreePlacement,"Tree Placement",-

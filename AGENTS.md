@@ -89,6 +89,6 @@ folders. Restart the game after deploying.
   `Key,"Text",-`. No trailing spaces inside texts (the game warns about them). Remove keys that are no longer used.
 - The 3D Noise generator used an old Minecraft version's generator as a baseline only: do not mention Minecraft or
   "beta" in code or texts, and name things after what they do (e.g. Hilliness, Ruggedness).
-- Rivers lower the terrain by at most one block.
+- River beds lower the terrain by at most one block; only tunnels (through basins too big to fill) cut deeper.
 - Keep the plan documents in `docs/` current: update status tables and record decisions and their reasons.
 - Commit only when asked, on the current feature branch, with a short summary line and a body explaining why.
