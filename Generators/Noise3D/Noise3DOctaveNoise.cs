@@ -12,16 +12,24 @@ internal sealed class Noise3DOctaveNoise
             octaves[i] = new Noise3DPerlinNoise(random);
     }
 
-    // indexed (x * sizeZ + z) * sizeY + y; progress is reported once per octave
+    // features smaller than this many grid steps across count as fine detail
+    private const double DetailSize = 4;
+
+    // indexed (x * sizeZ + z) * sizeY + y; progress is reported once per octave. detailWeight scales the octaves
+    // finer than DetailSize grid steps across: 0 leaves them out (rounded shapes), 2 doubles them (rugged shapes)
     public double[] Generate(double x, double y, double z, int sizeX, int sizeY, int sizeZ,
-        double scaleX, double scaleY, double scaleZ, Action<float>? progress = null)
+        double scaleX, double scaleY, double scaleZ, Action<float>? progress = null, double detailWeight = 1)
     {
         var values = new double[sizeX * sizeY * sizeZ];
         var octaveScale = 1.0;
         for (var i = 0; i < octaves.Length; i++)
         {
-            octaves[i].Add(values, x, y, z, sizeX, sizeY, sizeZ,
-                scaleX * octaveScale, scaleY * octaveScale, scaleZ * octaveScale, octaveScale);
+            var frequency = Math.Max(scaleX, scaleZ) * octaveScale;
+            var weight = frequency > 1 / DetailSize ? detailWeight : 1;
+            // Add divides by its last argument, so a smaller divisor gives a stronger octave
+            if (weight > 0)
+                octaves[i].Add(values, x, y, z, sizeX, sizeY, sizeZ,
+                    scaleX * octaveScale, scaleY * octaveScale, scaleZ * octaveScale, octaveScale / weight);
             octaveScale /= 2;
             progress?.Invoke((i + 1f) / octaves.Length);
         }

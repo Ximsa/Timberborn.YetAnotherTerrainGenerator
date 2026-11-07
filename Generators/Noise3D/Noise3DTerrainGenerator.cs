@@ -7,10 +7,11 @@ public sealed class Noise3DSettings
 
     public long Seed;
 
-    // climate everywhere on the map, 0..1; hills only reach full height where both are high (1 and 1 is a hot, wet
-    // rainforest, the hilliest climate), while low values flatten the terrain
-    public double Temperature = 1;
-    public double Humidity = 1;
+    // 0 is nearly flat, 1 the hilliest terrain
+    public double Hilliness = 1;
+
+    // 0 gives rounded hills and peaks, 1 rugged ones; 0.5 keeps the noise as it is
+    public double Ruggedness = 0.5;
 
     // 3D Noise height that becomes Timberborn height 0 (just below sea level, so oceans become shallow basins)
     public double BaseLevel = SeaLevel - 8;
@@ -83,11 +84,9 @@ public sealed class Noise3DTerrainGenerator
     // 3D Noise density on the coarse grid, indexed (x * gridZ + z) * GridHeight + y; progress is 0..1
     public void ComputeDensity(Action<float>? progress = null)
     {
-        // dry or cold climates flatten the hills: the hill scale falls off with (1 - temperature * humidity)^4
-        var dryness = 1 - Clamp01(settings.Temperature) * Clamp01(settings.Humidity);
-        dryness *= dryness;
-        dryness *= dryness;
-        var climate = 1 - dryness;
+        var hilliness = Clamp01(settings.Hilliness);
+        // fine noise octaves: 0 at ruggedness 0 (rounded), unchanged at 0.5, doubled at 1 (rugged)
+        var detailWeight = 2 * Clamp01(settings.Ruggedness);
 
         var random = new Random(SeedFrom(settings.Seed));
         var minLimitNoise = new Noise3DOctaveNoise(random, 16);
@@ -102,11 +101,11 @@ public sealed class Noise3DTerrainGenerator
         var depth = depthNoise.Generate2D(0, 0, gridX, gridZ, 200, 200);
         progress?.Invoke(0.05f);
         var main = mainNoise.Generate(0, 0, 0, gridX, GridHeight, gridZ, horizontal / 80, vertical / 160,
-            horizontal / 80, fraction => progress?.Invoke(0.05f + 0.15f * fraction));
+            horizontal / 80, fraction => progress?.Invoke(0.05f + 0.15f * fraction), detailWeight);
         var minLimit = minLimitNoise.Generate(0, 0, 0, gridX, GridHeight, gridZ, horizontal, vertical, horizontal,
-            fraction => progress?.Invoke(0.2f + 0.4f * fraction));
+            fraction => progress?.Invoke(0.2f + 0.4f * fraction), detailWeight);
         var maxLimit = maxLimitNoise.Generate(0, 0, 0, gridX, GridHeight, gridZ, horizontal, vertical, horizontal,
-            fraction => progress?.Invoke(0.6f + 0.4f * fraction));
+            fraction => progress?.Invoke(0.6f + 0.4f * fraction), detailWeight);
 
         density = new double[gridX * gridZ * GridHeight];
         var index = 0;
@@ -114,7 +113,7 @@ public sealed class Noise3DTerrainGenerator
         for (var x = 0; x < gridX; x++)
         for (var z = 0; z < gridZ; z++)
         {
-            var columnScale = Math.Min(1, (scale[column] + 256) / 512 * climate);
+            var columnScale = Math.Min(1, (scale[column] + 256) / 512 * hilliness);
             var columnDepth = depth[column] / 8000;
             if (columnDepth < 0)
                 columnDepth = -columnDepth * 0.3;
@@ -138,6 +137,8 @@ public sealed class Noise3DTerrainGenerator
             if (columnScale < 0)
                 columnScale = 0;
             columnScale += 0.5;
+            // low hilliness also steepens the falloff around the ground level, so the terrain gets close to flat
+            columnScale *= 0.25 + 0.75 * hilliness;
             columnDepth = columnDepth * GridHeight / 16;
             var groundLevel = GridHeight / 2.0 + columnDepth * 4;
             column++;

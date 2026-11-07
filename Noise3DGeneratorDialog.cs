@@ -8,8 +8,8 @@ namespace Timberborn.TerrainGenerator;
 public class Noise3DGeneratorDialog : TerrainJobDialog
 {
     private const string TitleKey = "Ximsa.TerrainGenerator.Tool.Noise3D";
-    private const string TemperatureKey = "Ximsa.TerrainGenerator.Noise3D.Temperature";
-    private const string HumidityKey = "Ximsa.TerrainGenerator.Noise3D.Humidity";
+    private const string RuggednessKey = "Ximsa.TerrainGenerator.Noise3D.Ruggedness";
+    private const string HillinessKey = "Ximsa.TerrainGenerator.Noise3D.Hilliness";
     private const string BaseLevelKey = "Ximsa.TerrainGenerator.Noise3D.BaseLevel";
     private const string VerticalScaleKey = "Ximsa.TerrainGenerator.Noise3D.VerticalScale";
     private const string HorizontalScaleKey = "Ximsa.TerrainGenerator.Noise3D.HorizontalScale";
@@ -24,14 +24,14 @@ public class Noise3DGeneratorDialog : TerrainJobDialog
     {
         SetTitle(loc.T(TitleKey));
         Content.Add(new GameSlider()
-            .SetLabel(loc.T(TemperatureKey))
-            .SetHorizontalSlider(new SliderValues<float>(0, 1, (float)settings.Temperature))
-            .RegisterChange(temperature => settings.Temperature = temperature)
+            .SetLabel(loc.T(HillinessKey))
+            .SetHorizontalSlider(new SliderValues<float>(0, 1, (float)settings.Hilliness))
+            .RegisterChange(hilliness => settings.Hilliness = hilliness)
             .AddEndLabel(value => $"{value:F2}"));
         Content.Add(new GameSlider()
-            .SetLabel(loc.T(HumidityKey))
-            .SetHorizontalSlider(new SliderValues<float>(0, 1, (float)settings.Humidity))
-            .RegisterChange(humidity => settings.Humidity = humidity)
+            .SetLabel(loc.T(RuggednessKey))
+            .SetHorizontalSlider(new SliderValues<float>(0, 1, (float)settings.Ruggedness))
+            .RegisterChange(ruggedness => settings.Ruggedness = ruggedness)
             .AddEndLabel(value => $"{value:F2}"));
         Content.Add(new GameSlider()
             .SetLabel(loc.T(BaseLevelKey))
