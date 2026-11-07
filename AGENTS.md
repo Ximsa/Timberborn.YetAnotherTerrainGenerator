@@ -12,10 +12,8 @@ Every tool opens a dialog with settings; nothing reacts to clicks on the map.
 
 | Path | What |
 |---|---|
-| `*.cs` (root) | Game-side code: tools (`*Tool.cs`), dialogs (`*Dialog.cs`), group buttons, `Configurator.cs` (Bindito bindings, `MapEditor` context), `MapEditorService` (terrain and entity access), `EntityPlacer` (trees, bushes, water sources) |
-| `Generators/` | Game-independent generators: `Noise3D`, `Wfc`, `Autoencoder` (latent statistics) |
-| `TerrainTools/` | Game-independent terrain tools: `Surface`, `CliffSharpener`, `RiverCarver`, `TreePlacer`, `TileQueue` |
-| `VoxelMap.cs`, `MapVoxelReader.cs` | Voxel grid and `.timber` reader, shared with the offline tools |
+| `Core/<Feature>/` | Timberborn-independent algorithms (also compiled by the offline tools): `Common` (`VoxelMap`, `MapVoxelReader`, `Surface`, `TileQueue`), `Autoencoder`, `Noise3D`, `Wfc`, `Smoothing`, `CliffSharpening`, `Rivers`, `Trees` |
+| `Game/<Feature>/` | Map editor code: a tool (`*Tool.cs`) and a dialog (`*Dialog.cs`) per feature; `Game/Common` has `ModStarter`, `Configurator` (Bindito bindings, `MapEditor` context), `MapEditorService` (terrain, entities, undo), `EntityPlacer` (trees, bushes, water sources), `TerrainJobDialog`, group buttons |
 | `Localizations/enUS.csv` | All UI texts |
 | `ToolGroups/` | `ToolGroupSpec` blueprints, one per bottom-bar group |
 | `Sprites/` | 256 x 256 button icons (line drawings: light grey fill, dark outline, transparent background) |
@@ -29,9 +27,9 @@ Every tool opens a dialog with settings; nothing reacts to clicks on the map.
 - Mod: `dotnet build Timberborn.TerrainGenerator.csproj` (Debug output in `bin/Debug/netstandard2.1`).
   It references the game's assemblies from `F:\GOG\Timberborn\Timberborn_Data\Managed` (publicized, so internal game
   types are usable) and TimberUi and Harmony from the user's Mods folder. Paths are set in the csproj.
-- The mod targets **netstandard2.1, C# 10**: no `PriorityQueue`, no newer BCL APIs (use `TerrainTools/TileQueue`).
-- Offline tools target net9.0 and link the game-independent source files. Keep `Generators/`, `TerrainTools/`,
-  `VoxelMap.cs` and `MapVoxelReader.cs` free of Unity and Timberborn references so they keep compiling there.
+- The mod targets **netstandard2.1, C# 10**: no `PriorityQueue`, no newer BCL APIs (use `Core/Common/TileQueue`).
+- Offline tools target net9.0 and compile all of `Core/`. Keep `Core/` free of Unity, Timberborn and `Game/` references
+  so they keep compiling there (see `ARCHITECTURE.md`).
 
 ## Deploy
 
@@ -66,7 +64,7 @@ folders. Restart the game after deploying.
 - `SetTerrain(z, n)` fills upwards from z; `UnsetTerrain(z, n)` removes downwards from z.
 - `TerrainPhysicsPatches` skips the game's load-time check that deletes floating terrain; keep it, as the generators
   make overhangs and floating islands.
-- Terrain tools edit only the top surface of each column (`TerrainTools/Surface`), so 3D terrain below survives.
+- Terrain tools edit only the top surface of each column (`Core/Common/Surface`), so 3D terrain below survives.
 - Long work runs in `TerrainJobDialog.RunJob`: compute on a background thread (cancellable, reports progress through
   `ProgressReporter` with localization keys as stage names), then apply on the main thread spread over frames.
   Generators remove all entities; terrain tools pass `removeAllEntities: false` to remove only entities in changed

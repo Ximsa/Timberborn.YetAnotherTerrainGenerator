@@ -55,4 +55,5 @@ clicks instead of hours of brushing.
 - More variety from the Autoencoder Generator: fine-tuning on the built-in maps (see `docs/autoencoder-tuning.md`).
 - WFC speed on large maps with many patterns (one in-game run took about 6.5 minutes).
 
-Details, decisions and their reasons are in the plans in `docs/`; how to work in the repo is in `AGENTS.md`.
+Details, decisions and their reasons are in the plans in `docs/`; how the code is organised is in `ARCHITECTURE.md`, how
+to work in the repo in `AGENTS.md`.
