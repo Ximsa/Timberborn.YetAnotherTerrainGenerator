@@ -3,6 +3,7 @@ using Timberborn.Localization;
 using TimberUi.CommonUi;
 using Unity.Mathematics;
 using UnityEngine;
+using Timberborn.TerrainGenerator.Generators.Autoencoder;
 using UnityEngine.UIElements;
 using Random = System.Random;
 
@@ -12,13 +13,8 @@ public class TerrainGeneratorDialog : TerrainJobDialog
 {
     private const string TitleKey = "Ximsa.TerrainGenerator.Title";
     private const string EncoderKey = "Ximsa.TerrainGenerator.Encoder";
-    private const string NoiseKey = "Ximsa.TerrainGenerator.Noise";
-    private const string NoiseStdKey = "Ximsa.TerrainGenerator.NoiseStd";
-    private const string NoiseMeanKey = "Ximsa.TerrainGenerator.NoiseMean";
+    private const string VarietyKey = "Ximsa.TerrainGenerator.Variety";
     private const string GenerateKey = "Ximsa.TerrainGenerator.Generate";
-    private const string MedianBlurPassesKey = "Ximsa.TerrainGenerator.Passes";
-    private const string MedianBlurRadiusKey = "Ximsa.TerrainGenerator.Radius";
-    private const string MedianBlurTitleKey = "Ximsa.TerrainGenerator.MedianBlurTitle";
     private const string ZoomFactorKey = "Ximsa.TerrainGenerator.ZoomFactor";
     private const string MaxHeightKey = "Ximsa.TerrainGenerator.MaxHeight";
 
@@ -32,31 +28,14 @@ public class TerrainGeneratorDialog : TerrainJobDialog
         SetTitle(loc.T(TitleKey));
         Content.Add(new GameSlider()
             .SetLabel($"{loc.T(EncoderKey)}")
-            .SetHorizontalSlider(new SliderValues<float>(-12, 12, settings.EncoderBias))
-            .RegisterChange(encoderBias => settings.EncoderBias = encoderBias)
-            .AddEndLabel(value => $"{value:G3}"));
-        Content.AddLabel(loc.T(NoiseKey), NoiseKey);
+            .SetHorizontalSlider(new SliderValues<float>(0, 1, settings.KeepCurrent))
+            .RegisterChange(keepCurrent => settings.KeepCurrent = keepCurrent)
+            .AddEndLabel(value => $"{value * 100:F0}%"));
         Content.Add(new GameSlider()
-            .SetLabel($"{loc.T(NoiseMeanKey)}")
-            .SetHorizontalSlider(new SliderValues<float>(-12, 12, settings.NoiseMean))
-            .RegisterChange(noiseMean => settings.NoiseMean = noiseMean)
-            .AddEndLabel(value => $"{value:G3}"));
-        Content.Add(new GameSlider()
-            .SetLabel($"{loc.T(NoiseStdKey)}")
-            .SetHorizontalSlider(new SliderValues<float>(0, 12, settings.NoiseStd))
-            .RegisterChange(noiseStd => settings.NoiseStd = noiseStd)
-            .AddEndLabel(value => $"{value:G3}"));
-        Content.AddLabel(loc.T(MedianBlurTitleKey), MedianBlurTitleKey);
-        Content.Add(new GameSliderInt()
-            .SetLabel($"{loc.T(MedianBlurPassesKey)}")
-            .SetHorizontalSlider(new SliderValues<int>(0, 8, settings.MedianBlurPasses))
-            .RegisterChange(medianBlurPasses => settings.MedianBlurPasses = medianBlurPasses)
-            .AddEndLabel(value => $"{value}"));
-        Content.Add(new GameSliderInt()
-            .SetLabel($"{loc.T(MedianBlurRadiusKey)}")
-            .SetHorizontalSlider(new SliderValues<int>(1, 8, settings.MedianBlurRadius))
-            .RegisterChange(medianBlurRadius => settings.MedianBlurRadius = medianBlurRadius)
-            .AddEndLabel(value => $"{value}"));
+            .SetLabel($"{loc.T(VarietyKey)}")
+            .SetHorizontalSlider(new SliderValues<float>(0, 3, settings.Variety))
+            .RegisterChange(variety => settings.Variety = variety)
+            .AddEndLabel(value => $"{value:F2}"));
         Content.Add(new GameSlider()
             .SetLabel($"{loc.T(ZoomFactorKey)}")
             .SetHorizontalSlider(new SliderValues<float>(1, 8, settings.ZoomFactor))
@@ -77,7 +56,8 @@ public class TerrainGeneratorDialog : TerrainJobDialog
     {
         // snapshot, so moving sliders while the job runs does not affect it
         var jobSettings = settings.Clone();
-        RunJob(generateButton, (terrain, mapSize, progress) => Pipeline2D(terrain, mapSize, jobSettings, progress));
+        RunJob(generateButton, (terrain, mapSize, progress) =>
+            VoxelMap.FromHeightmap(Pipeline2D(terrain, mapSize, jobSettings, progress), mapSize.z));
     }
 
     // encode current map, add noise, decode map; runs on a background thread
@@ -85,8 +65,9 @@ public class TerrainGeneratorDialog : TerrainJobDialog
         ProgressReporter progress)
     {
         // load models
-        var (encoder, decoder) = progress.Stage(LoadingModelsKey, 0f, 0.05f,
-            _ => (LoadModel("Encoder2D.npz"), LoadModel("Decoder2D.npz")));
+        var (encoder, decoder, latentStats) = progress.Stage(LoadingModelsKey, 0f, 0.05f,
+            _ => (LoadModel("Encoder2D.npz"), LoadModel("Decoder2D.npz"),
+                LatentStats.Load(ModStarter.OriginPath + "/Models/LatentStats.txt")));
 
         var inputDim = (int)Math.Sqrt(encoder.weight1.Shape[1]);
         var encodedSize = decoder.weight1.Shape[1];
@@ -105,10 +86,10 @@ public class TerrainGeneratorDialog : TerrainJobDialog
 
         var decoded = progress.Stage(DecodingKey, 0.1f, 0.15f, _ =>
         {
-            // generate noise
-            var noise = ((np.random.rand(1, encodedSize) - 0.5) * settings.NoiseStd + settings.NoiseMean)
-                .astype(np.float32);
-            encoded = encoded * settings.EncoderBias + noise;
+            // sample around the built-in maps' latents, blending in the current map's
+            var sampled = latentStats.Sample(encoded.flatten().ToArray<float>(), settings.KeepCurrent,
+                settings.Variety, new Random());
+            encoded = np.array(sampled).reshape(1, encodedSize);
 
             // decode
             var result = RunModel(encoded, decoder);
@@ -120,7 +101,7 @@ public class TerrainGeneratorDialog : TerrainJobDialog
         //decoded = np.tanh(decoded, NPTypeCode.Float) + 0.25f * decoded;
         decoded = decoded.reshape(inputDim, inputDim);
 
-        decoded = progress.Stage(ScalingKey, 0.15f, 0.45f, report =>
+        decoded = progress.Stage(ScalingKey, 0.15f, 0.9f, report =>
         {
             // zoom
             if (decoded.Shape[0] < mapSize.y || decoded.Shape[1] < mapSize.x)
@@ -143,16 +124,17 @@ public class TerrainGeneratorDialog : TerrainJobDialog
                 $"{offsetDim0}:{mapSize.y + offsetDim0},{offsetDim1}:{mapSize.x + offsetDim1}"];
         });
 
-        return progress.Stage(FilteringKey, 0.45f, 1f, report =>
+        // round off the square blocks that enlarging by nearest neighbour leaves
+        decoded = progress.Stage(FilteringKey, 0.9f, 1f, _ =>
         {
-            // filter
-            Debug.Log($"filter {settings.MedianBlurRadius} {settings.MedianBlurPasses}");
-            decoded = decoded.MedianBlur(settings.MedianBlurRadius, settings.MedianBlurPasses, report);
-
-            // normalize
-            decoded -= decoded.min();
-            return decoded / decoded.max() * (settings.MaxTerrainHeight - 1.0f);
+            var blurred = GaussianBlur.Apply(decoded.astype(np.float32).flatten().ToArray<float>(), mapSize.x,
+                mapSize.y, GaussianBlur.DefaultSigma);
+            return np.array(blurred).reshape(mapSize.y, mapSize.x);
         });
+
+        // stretch to the map's height
+        decoded -= decoded.min();
+        return decoded / decoded.max() * (settings.MaxTerrainHeight - 1.0f);
     }
 
     private static (NDArray weight1, NDArray bias1, NDArray weight2, NDArray bias2, NDArray weight3, NDArray bias3)
@@ -194,12 +176,12 @@ public class TerrainGeneratorDialog : TerrainJobDialog
 
     private sealed class Settings
     {
-        public float EncoderBias = -1;
+        // 0 ignores the current map, 1 keeps its latent and only adds variety
+        public float KeepCurrent;
         public int MaxTerrainHeight;
-        public int MedianBlurPasses = 1;
-        public int MedianBlurRadius = 4;
-        public float NoiseMean;
-        public float NoiseStd = 1;
+
+        // noise in standard deviations of the built-in maps' latents
+        public float Variety = 1.5f;
         public float ZoomFactor = 1.25f;
 
         public Settings Clone()

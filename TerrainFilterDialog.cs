@@ -1,4 +1,5 @@
 using NumSharp;
+using Timberborn.TerrainGenerator.TerrainTools;
 using Timberborn.Localization;
 using TimberUi.CommonUi;
 using UnityEngine.UIElements;
@@ -41,15 +42,19 @@ public class TerrainFilterDialog : TerrainJobDialog
     {
         var passes = this.passes;
         var radius = this.radius;
-        RunJob(applyButton, (terrain, _, progress) =>
+        RunJob(applyButton, (terrain, mapSize, progress) =>
         {
-            terrain = terrain.astype(np.float32).sum(0);
-            var originalMax = terrain.max();
-            var originalMin = terrain.min();
-            terrain = progress.Stage(FilteringKey, 0, 1, report => terrain.MedianBlur(radius, passes, report));
-            terrain -= terrain.min() + originalMin;
-            terrain = terrain / terrain.max() * originalMax;
-            return terrain;
-        });
+            var voxels = VoxelMap.FromTerrain(terrain);
+            var surface = np.array(Surface.Heights(voxels)).reshape(mapSize.y, mapSize.x).astype(np.float32);
+            float originalMin = surface.min();
+            float originalMax = surface.max();
+            surface = progress.Stage(FilteringKey, 0, 1, report => surface.MedianBlur(radius, passes, report));
+            // stretch the smoothed surface back to the original height range
+            float smoothedMin = surface.min();
+            var smoothedRange = Math.Max(1e-6f, (float)surface.max() - smoothedMin);
+            surface = (surface - smoothedMin) / smoothedRange * (originalMax - originalMin) + originalMin;
+            var heights = np.round_(surface).astype(np.int32).flatten().ToArray<int>();
+            return Surface.WithHeights(voxels, heights);
+        }, removeAllEntities: false);
     }
 }

@@ -7,16 +7,18 @@ namespace Timberborn.TerrainGenerator;
 public class TerrainGeneratorGroupButton : ToolGroupBottomBarButton
 {
     private readonly AutoencoderGeneratorTool autoencoderGeneratorTool;
-    private readonly Phase0ChecksTool phase0ChecksTool;
+    private readonly Noise3DGeneratorTool noise3DGeneratorTool;
+    private readonly WfcGeneratorTool wfcGeneratorTool;
 
     public TerrainGeneratorGroupButton(ToolGroupService toolGroupService,
         ToolGroupButtonFactory toolGroupButtonFactory, ToolButtonFactory toolButtonFactory,
         IAssetLoader assetLoader, AutoencoderGeneratorTool autoencoderGeneratorTool,
-        Phase0ChecksTool phase0ChecksTool) :
+        Noise3DGeneratorTool noise3DGeneratorTool, WfcGeneratorTool wfcGeneratorTool) :
         base(toolGroupService, toolGroupButtonFactory, toolButtonFactory, assetLoader)
     {
         this.autoencoderGeneratorTool = autoencoderGeneratorTool;
-        this.phase0ChecksTool = phase0ChecksTool;
+        this.noise3DGeneratorTool = noise3DGeneratorTool;
+        this.wfcGeneratorTool = wfcGeneratorTool;
     }
 
     protected override string GroupId => "TerrainGenerators";
@@ -24,6 +26,7 @@ public class TerrainGeneratorGroupButton : ToolGroupBottomBarButton
     protected override IEnumerable<(ITool Tool, string SpritePath)> Tools => new (ITool, string)[]
     {
         (autoencoderGeneratorTool, "Sprites/terrain-generator-button"),
-        (phase0ChecksTool, "Sprites/terrain-sharpen-button")
+        (noise3DGeneratorTool, "Sprites/noise3d-generator-button"),
+        (wfcGeneratorTool, "Sprites/wfc-generator-button")
     };
 }
