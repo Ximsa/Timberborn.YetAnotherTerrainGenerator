@@ -16,7 +16,8 @@ public static class Pipeline
         return result.Select(h => h / max).ToArray();
     }
 
-    // decoded 128 x 128 output -> scaled to the map, zoomed, randomly cropped, median filtered, normalised to 0..1
+    // decoded 128 x 128 output -> scaled to the map, zoomed, randomly cropped, optionally median filtered (the generator
+    // no longer does this), normalised to 0..1
     public static float[] Finish(float[] decoded, int side, float zoom, int medianRadius, int medianPasses,
         Random random)
     {

@@ -13,8 +13,10 @@ using TerrainPreview;
 //       bakes an unsharp mask into the decoder's last layer: every output map is sharpened exactly as if the filter
 //       ran on it afterwards, since the layer is linear
 //   AutoencoderTuner preview --maps <dir> [--current Diorama] [--decoder ...] [--stats ...] [--variety 1.5] [--keep 0]
-//       [--legacy-multiplier -1 --legacy-noise 1] [--samples 8] [--size 256] [--seed 1] --out preview.png
-//       generates like the mod's pipeline and prints diversity (how different samples are) and relief
+//       [--legacy-multiplier -1 --legacy-noise 1] [--samples 8] [--size 256] [--seed 1]
+//       [--median-passes 0 --median-radius 4] --out preview.png
+//       generates like the mod's pipeline and prints diversity (how different samples are) and relief; the median
+//       filter the generator used to run afterwards (one pass, radius 4) is off unless --median-passes is given
 var options = ParseOptions(args.Skip(1));
 var models = options.GetValueOrDefault("models", "Models");
 var stopwatch = Stopwatch.StartNew();
@@ -68,7 +70,9 @@ switch (args.FirstOrDefault())
         }
 
         var samples = Enumerable.Range(0, int.Parse(options.GetValueOrDefault("samples", "8")))
-            .Select(_ => Pipeline.Finish(decoder.Run(sample()), size, 1.25f, 4, 1, random))
+            .Select(_ => Pipeline.Finish(decoder.Run(sample()), size, 1.25f,
+                int.Parse(options.GetValueOrDefault("median-radius", "4")),
+                int.Parse(options.GetValueOrDefault("median-passes", "0")), random))
             .ToList();
         var real = maps.Select(m => Pipeline.Normalize(m.Heights, m.SizeX, m.SizeY, size)).ToList();
         Console.WriteLine($"samples: diversity {Diversity(samples):F3}, relief {Relief(samples, size):F3} | " +

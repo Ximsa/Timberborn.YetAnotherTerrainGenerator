@@ -5,7 +5,6 @@ Ximsa.TerrainGenerator.FilterTitle,"Filter Tool",-
 Ximsa.TerrainGenerator.Generate,"Generate Terrain",-
 Ximsa.TerrainGenerator.Passes,"Number of Filter Passes",-
 Ximsa.TerrainGenerator.Radius,"Radius of the Filter",-
-Ximsa.TerrainGenerator.MedianBlurTitle,"Global Median Blur",-
 Ximsa.TerrainGenerator.Apply,"Apply",-
 Ximsa.TerrainGenerator.ZoomFactor,"Zoom Factor",-
 Ximsa.TerrainGenerator.Cancel,"Cancel",-
