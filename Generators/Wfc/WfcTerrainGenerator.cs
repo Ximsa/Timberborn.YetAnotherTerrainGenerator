@@ -15,7 +15,10 @@ public sealed class WfcSettings
     // small values strongly prefer the sources' heights without forbidding others
     public double HeightPenalty = 0.5;
 
-    // share of a 4 x 4 x 4 block's voxels that must be solid for the block to count as solid; low values keep thin
+    // edge length in voxels of the coarse blocks WFC works on; heights come in steps of this size
+    public int BlockSize = WfcTerrainGenerator.DefaultBlockSize;
+
+    // share of a block's voxels that must be solid for the block to count as solid; low values keep thin
     // details (ridges, pillars, overhangs), high values give chunkier terrain
     public double SolidThreshold = 0.25;
 
@@ -38,12 +41,13 @@ public sealed class WfcSettings
 }
 
 // Generates terrain with 3D overlapping-model wave function collapse, learning voxel patterns from source maps.
-// WFC runs on a coarse grid of 4 x 4 x 4 voxel blocks: patterns of single voxels are far too small to capture
-// Timberborn's terraces and cliffs (they degenerate into pillars), while coarse patterns span 8-12 tiles and keep the
-// number of distinct patterns small. Blocks are scaled back up afterwards, so heights come in steps of 4.
+// WFC runs on a coarse grid of voxel blocks (4 x 4 x 4 by default): patterns of single voxels are far too small to
+// capture Timberborn's terraces and cliffs (they degenerate into pillars), while coarse patterns span many tiles and
+// keep the number of distinct patterns small. Blocks are scaled back up afterwards, so heights come in steps of the
+// block size.
 public sealed class WfcTerrainGenerator
 {
-    public const int BlockSize = 4;
+    public const int DefaultBlockSize = 4;
 
     private readonly WfcSettings settings;
     private WfcPatternSet? patterns;
@@ -61,11 +65,14 @@ public sealed class WfcTerrainGenerator
 
     public void Learn(IEnumerable<VoxelMap> sources, Action<float>? progress = null)
     {
+        if (settings.BlockSize < 1)
+            throw new ArgumentOutOfRangeException(nameof(settings.BlockSize), "Must be at least 1");
         if (settings.PatternCoverage <= 0 || settings.PatternCoverage > 1)
             throw new ArgumentOutOfRangeException(nameof(settings.PatternCoverage), "Must be above 0 and at most 1");
         if (settings.SolidThreshold < 0 || settings.SolidThreshold > 1)
             throw new ArgumentOutOfRangeException(nameof(settings.SolidThreshold), "Must be between 0 and 1");
-        patterns = WfcPatternSet.Learn(sources.Select(map => Downsample(map, settings.SolidThreshold)),
+        var coarseSources = sources.Select(map => Downsample(map, settings.SolidThreshold, settings.BlockSize));
+        patterns = WfcPatternSet.Learn(coarseSources,
             settings.PatternSize, settings.Symmetry, settings.PeriodicInput, settings.HeightPenalty,
             settings.PatternCoverage, progress);
     }
@@ -76,7 +83,8 @@ public sealed class WfcTerrainGenerator
         if (patterns == null)
             throw new InvalidOperationException("Learn must run first");
         var n = patterns.Size;
-        int coarseX = Blocks(sizeX), coarseY = Blocks(sizeY), coarseZ = Blocks(sizeZ);
+        var blockSize = settings.BlockSize;
+        int coarseX = Blocks(sizeX, blockSize), coarseY = Blocks(sizeY, blockSize), coarseZ = Blocks(sizeZ, blockSize);
         if (coarseX < n || coarseY < n || coarseZ < n)
             throw new InvalidOperationException("The map is too small for the pattern size");
         for (var attempt = 0; attempt < settings.Attempts; attempt++)
@@ -87,7 +95,7 @@ public sealed class WfcTerrainGenerator
             var solved = solver.Run(progress);
             Backtracks += solver.Backtracks;
             if (solved)
-                return Upsample(ToCoarseVoxels(solver, coarseX, coarseY, coarseZ), sizeX, sizeY, sizeZ);
+                return Upsample(ToCoarseVoxels(solver, coarseX, coarseY, coarseZ), sizeX, sizeY, sizeZ, blockSize);
         }
 
         throw new InvalidOperationException(
@@ -95,24 +103,25 @@ public sealed class WfcTerrainGenerator
             "try another seed, a smaller pattern size or other source maps");
     }
 
-    private static int Blocks(int size)
+    private static int Blocks(int size, int blockSize)
     {
-        return (size + BlockSize - 1) / BlockSize;
+        return (size + blockSize - 1) / blockSize;
     }
 
     // a block is solid when at least the given share of its voxels (within the map) is solid
-    public static VoxelMap Downsample(VoxelMap map, double solidThreshold)
+    public static VoxelMap Downsample(VoxelMap map, double solidThreshold, int blockSize = DefaultBlockSize)
     {
-        int coarseX = Blocks(map.SizeX), coarseY = Blocks(map.SizeY), coarseZ = Blocks(map.SizeZ);
+        int coarseX = Blocks(map.SizeX, blockSize), coarseY = Blocks(map.SizeY, blockSize),
+            coarseZ = Blocks(map.SizeZ, blockSize);
         var coarse = new VoxelMap(coarseX, coarseY, coarseZ, new bool[coarseX * coarseY * coarseZ]);
         for (var cz = 0; cz < coarseZ; cz++)
         for (var cy = 0; cy < coarseY; cy++)
         for (var cx = 0; cx < coarseX; cx++)
         {
             int solid = 0, total = 0;
-            for (var z = cz * BlockSize; z < Math.Min(map.SizeZ, (cz + 1) * BlockSize); z++)
-            for (var y = cy * BlockSize; y < Math.Min(map.SizeY, (cy + 1) * BlockSize); y++)
-            for (var x = cx * BlockSize; x < Math.Min(map.SizeX, (cx + 1) * BlockSize); x++)
+            for (var z = cz * blockSize; z < Math.Min(map.SizeZ, (cz + 1) * blockSize); z++)
+            for (var y = cy * blockSize; y < Math.Min(map.SizeY, (cy + 1) * blockSize); y++)
+            for (var x = cx * blockSize; x < Math.Min(map.SizeX, (cx + 1) * blockSize); x++)
             {
                 total++;
                 if (map[x, y, z])
@@ -125,13 +134,14 @@ public sealed class WfcTerrainGenerator
         return coarse;
     }
 
-    public static VoxelMap Upsample(VoxelMap coarse, int sizeX, int sizeY, int sizeZ)
+    public static VoxelMap Upsample(VoxelMap coarse, int sizeX, int sizeY, int sizeZ,
+        int blockSize = DefaultBlockSize)
     {
         var voxels = new VoxelMap(sizeX, sizeY, sizeZ, new bool[sizeX * sizeY * sizeZ]);
         for (var z = 0; z < sizeZ; z++)
         for (var y = 0; y < sizeY; y++)
         for (var x = 0; x < sizeX; x++)
-            voxels[x, y, z] = z == 0 || coarse[x / BlockSize, y / BlockSize, z / BlockSize];
+            voxels[x, y, z] = z == 0 || coarse[x / blockSize, y / blockSize, z / blockSize];
         return voxels;
     }
 

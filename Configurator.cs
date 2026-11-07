@@ -33,6 +33,7 @@ public class MapEditorConfigurator : Configurator
 
         Bind<AutoencoderGeneratorTool>().AsSingleton();
         Bind<Noise3DGeneratorTool>().AsSingleton();
+        Bind<WfcGeneratorTool>().AsSingleton();
         Bind<TerrainGeneratorGroupButton>().AsSingleton();
         MultiBind<BottomBarModule>().ToProvider<BottomBarModuleProvider<TerrainGeneratorGroupButton>>().AsSingleton();
     }

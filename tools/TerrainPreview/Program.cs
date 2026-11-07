@@ -8,8 +8,8 @@ using TerrainPreview;
 //   TerrainPreview noise3d --size 128x128x23 --seed 1 [--climate rainforest|betabiomes] [--base 56] [--vscale 3]
 //       [--hscale 3] --out preview.png
 //   TerrainPreview wfc --sources a.timber,b.timber --size 64x64x23 --seed 1 [--n 3] [--symmetry true]
-//       [--periodic false] [--penalty 0.5] [--threshold 0.25] [--coverage 0.95] --out preview.png
-//   TerrainPreview threshold-sweep --sources a.timber,b.timber [--size 128x128x23] [--seed 1] --out-dir <dir>
+//       [--periodic false] [--penalty 0.5] [--threshold 0.25] [--coverage 0.95] [--block 4] [--seeds 1-10] --out preview.png
+//   TerrainPreview threshold-sweep --sources a.timber,b.timber [--size 128x128x23] [--seed 1] [--start 0] --out-dir <dir>
 //   TerrainPreview map <file.timber> --out preview.png
 if (args.Length == 0)
 {
@@ -56,7 +56,8 @@ switch (args[0])
             PeriodicInput = options.GetValueOrDefault("periodic", "false") == "true",
             HeightPenalty = double.Parse(options.GetValueOrDefault("penalty", "0.5"), System.Globalization.CultureInfo.InvariantCulture),
             SolidThreshold = double.Parse(options.GetValueOrDefault("threshold", "0.25"), System.Globalization.CultureInfo.InvariantCulture),
-            PatternCoverage = double.Parse(options.GetValueOrDefault("coverage", "0.95"), System.Globalization.CultureInfo.InvariantCulture)
+            PatternCoverage = double.Parse(options.GetValueOrDefault("coverage", "0.95"), System.Globalization.CultureInfo.InvariantCulture),
+            BlockSize = int.Parse(options.GetValueOrDefault("block", "4"))
         };
         var sources = options["sources"].Split(',').Select(path =>
         {
@@ -66,6 +67,28 @@ switch (args[0])
         var generator = new WfcTerrainGenerator(settings);
         generator.Learn(sources);
         Console.WriteLine($"learned {generator.PatternCount} patterns in {stopwatch.ElapsedMilliseconds} ms");
+        if (options.TryGetValue("seeds", out var seedRange))
+        {
+            // one contact sheet with a tile per seed, learning only once
+            var bounds = seedRange.Split('-').Select(int.Parse).ToArray();
+            var tiles = new List<(string Label, Image Tile)>();
+            for (var seed = bounds[0]; seed <= bounds[^1]; seed++)
+            {
+                var run = Stopwatch.StartNew();
+                settings.Seed = seed;
+                var backtracksBefore = generator.Backtracks;
+                var result = generator.Generate(size.X, size.Y, size.Z);
+                Console.Write($"seed {seed,2}: {run.ElapsedMilliseconds,6} ms, {generator.AttemptsUsed} attempt(s), " +
+                              $"{generator.Backtracks - backtracksBefore} backtracks | ");
+                PrintStats(result);
+                tiles.Add((seed.ToString(), VoxelRenderer.RenderIsometric(result)));
+            }
+
+            Sheet(tiles).SavePng(output);
+            Console.WriteLine($"wrote {output} after {stopwatch.ElapsedMilliseconds} ms");
+            return 0;
+        }
+
         map = generator.Generate(size.X, size.Y, size.Z);
         Console.WriteLine($"generated in {stopwatch.ElapsedMilliseconds} ms after {generator.AttemptsUsed} attempt(s), {generator.Backtracks} backtracks");
         break;
@@ -83,7 +106,8 @@ switch (args[0])
         }).ToList();
         var roundTrips = new List<(string Label, Image Tile)>();
         var results = new List<(string Label, Image Tile)>();
-        for (var percent = 0; percent <= 100; percent += 10)
+        var startPercent = int.Parse(options.GetValueOrDefault("start", "0"));
+        for (var percent = startPercent; percent <= 100; percent += 10)
         {
             var threshold = percent / 100.0;
             var label = $"{percent}%";

@@ -43,3 +43,18 @@ Ximsa.TerrainGenerator.Noise3D.BetaBiomes,"Varying beta biomes instead of rainfo
 Ximsa.TerrainGenerator.Progress.Climate,"Computing climate",-
 Ximsa.TerrainGenerator.Progress.Noise,"Computing 3D noise",-
 Ximsa.TerrainGenerator.Progress.Shaping,"Shaping terrain",-
+Ximsa.TerrainGenerator.Tool.Wfc,"WFC Generator",-
+Ximsa.TerrainGenerator.Tool.Wfc.Description,"Generates terrain in the style of other maps by wave function collapse over their terrain patterns.",-
+Ximsa.TerrainGenerator.Wfc.Sources,"Learn from these maps",-
+Ximsa.TerrainGenerator.Wfc.CurrentMap,"Current map",-
+Ximsa.TerrainGenerator.Wfc.MoreMaps,"More maps",-
+Ximsa.TerrainGenerator.Wfc.BuiltInMaps,"Built-in maps",-
+Ximsa.TerrainGenerator.Wfc.UserMaps,"Your maps",-
+Ximsa.TerrainGenerator.Wfc.SolidThreshold,"Solid threshold (share of a block that makes it solid)",-
+Ximsa.TerrainGenerator.Wfc.BlockSize,"Block size (tiles per block and height step)",-
+Ximsa.TerrainGenerator.Wfc.PatternSize,"Pattern size (blocks)",-
+Ximsa.TerrainGenerator.Wfc.HeightPenalty,"Height penalty (likelihood per layer away from the source height)",-
+Ximsa.TerrainGenerator.Wfc.Coverage,"Pattern coverage (drops rare patterns)",-
+Ximsa.TerrainGenerator.Progress.ReadingMaps,"Reading maps",-
+Ximsa.TerrainGenerator.Progress.Learning,"Learning patterns",-
+Ximsa.TerrainGenerator.Progress.Solving,"Solving",-
