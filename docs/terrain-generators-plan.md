@@ -17,6 +17,7 @@ bottom-bar button group that expands into three buttons.
 | Beta terrain shape | Full 3D density noise, so overhangs and arches appear |
 | Beta faithfulness | Port beta's noise generator and density code, but use .NET `System.Random` instead of Java's `Random` (seeds will not match Minecraft) |
 | Beta focus | Overworld above (and just below) sea level; skip caves, ores and other underground features |
+| Beta biome | Rainforest climate everywhere by default (hot and wet, so beta's hill noise applies in full); beta's varying biome climate stays available as an option |
 | Floating terrain | Keep floating chunks, like beta |
 | Extras | Terrain only: no water sources, trees or bushes |
 | WFC model | Overlapping model on **3D voxels**, learning from one or more source maps |
@@ -110,24 +111,34 @@ The noise is sampled at the scaled coordinates, rather than generating a full be
 
 ### Phase 4: WFC Generator
 
-- Learn N×N×N voxel patterns (default N = 2, optional 3) with their frequencies from all checked source maps combined.
-- Constrain the bottom layer to solid and the top layer to air to cut down contradictions.
-- Lowest-entropy cell selection, weighted by pattern frequency, with seeded random choices.
-- Propagation using precomputed pattern compatibility per direction; bitset storage per cell.
-- On contradiction: restart with a new seed, up to a retry limit. If full-map runs prove too slow or
-  fail too often, fall back to generating the map in overlapping blocks.
+Adjusted after the first previews (single-voxel 2x2x2 patterns degenerate into pillars; 3x3x3 patterns at full
+resolution give thousands of patterns and are far too slow):
+
+- **Coarse grid:** WFC runs on blocks of 4 x 4 x 4 voxels (fixed). A block is solid when at least the solid threshold
+  (setting, default 25%) of its voxels is; the result is scaled back up, so heights come in steps of 4 (terraces and cliffs).
+- **Patterns:** 3 x 3 x 3 coarse blocks (12 x 12 x 12 tiles) by default, sliding window with stride 1, deduplicated by
+  exact content, rotations and mirror images folded in. Never turned upside down.
+- **Height-aware, softly:** every pattern may appear at every height; its weight halves for each coarse layer away from
+  where it was seen (height penalty setting, default 0.5). No hard height limits.
+- **Pruning:** only the most frequent patterns that together cover 95% of all occurrences are kept (pattern coverage
+  setting). Rare patterns are most of the count for large source sets (all 19 built-in maps: 24,646 -> 4,763) but
+  little of their terrain.
+- **Compatibility:** built during learning with one hashmap per direction, from overlap signature to the bitset of
+  patterns with that overlap.
+- **Propagation:** each cell remembers the patterns it lost since it was last processed; only neighbour patterns those
+  lost patterns supported (from the direction tables) are re-checked. 128 x 128 with Diorama + Cliffside: about 12 s
+  outside the game; 256 x 256: about 30 s per attempt.
+- On contradiction: backtracking with an undo log (undo the last choice, ban it, propagate again; step further back if
+  needed), up to 2,000 undone choices per attempt, then restart with a new seed (up to 5 attempts).
 - Source checklist: "Current map" and "Diorama" are checked by default. An expandable "More maps"
-  section lists, unchecked, the other built-in maps (from `MapRepository.GetBuiltinMapNames()`) and
-  the user's own saved maps (from `MapRepository.GetUserMapNames()`, loaded with
-  `MapFileReference.FromUserFolder(name)`), in two labelled sub-lists.
+  section lists, unchecked, the other built-in maps (from `MapRepository.GetBuiltinMapNames()`, hiding names that
+  start with `_`) and the user's own saved maps (from `MapRepository.GetUserMapNames()`), in two labelled sub-lists.
   Patterns and frequencies from all checked maps are merged. Generate is disabled while nothing is checked.
 - Built-in maps are loaded at runtime from the game itself, through
-  `MapRepository.OpenMap(MapFileReference.FromResource(name))` and `MapDeserializer.Load`, and
-  their terrain voxels are read from the serialized `TerrainMap`. Nothing is copied into the mod, so
-  no game content is redistributed. Phase 0 checks how to decode the voxels from the serialized map.
-- Progress: fraction of collapsed cells.
-- Dialog settings: source checklist, pattern size, seed, symmetry (rotations/reflections on or off),
-  periodic input on or off, retry limit.
+  `MapRepository.OpenMap(MapFileReference.FromResource(name))` and `MapVoxelReader`. Nothing is copied into the mod.
+- Progress: fraction of decided cells.
+- Dialog settings: source checklist, pattern size (2 or 3), seed, symmetry, periodic input, height tolerance.
+- Open: variety. With few small sources, their features repeat across big maps; more sources help.
 
 ### Phase 5: Polish and release
 
@@ -143,6 +154,8 @@ A second button group, built with the same group code as the generator group, ho
 - **Terrain smoothing** (the existing Global Terrain Filter, moved into the group)
 - **River carver** (new)
 - **Tree placement** (new)
+- **Cliff sharpening** (new): a post-generation filter that segregates terrain into flatter terraces with
+  steeper cliffs between them, like typical Timberborn maps, for easier building placement
 
 To be planned in detail after this plan is done. Note that tree placement will need to spawn natural
 resources, which this plan's generators deliberately leave out.

@@ -33,6 +33,11 @@
     </ItemGroup>
 
     <ItemGroup>
+        <!-- offline tools (e.g. the terrain preview renderer) are separate projects -->
+        <Compile Remove="tools/**"/>
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="NumSharp" Version="0.30.0"/>
         <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.3" PrivateAssets="all"/>
     </ItemGroup>
