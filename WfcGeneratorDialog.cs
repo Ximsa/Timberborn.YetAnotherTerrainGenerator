@@ -6,7 +6,6 @@ using Timberborn.TerrainGenerator.Generators.Wfc;
 using TimberUi.CommonUi;
 using UnityEngine;
 using UnityEngine.UIElements;
-using Random = System.Random;
 
 namespace Timberborn.TerrainGenerator;
 
@@ -18,8 +17,6 @@ public class WfcGeneratorDialog : TerrainJobDialog
     private const string MoreMapsKey = "Ximsa.TerrainGenerator.Wfc.MoreMaps";
     private const string BuiltInMapsKey = "Ximsa.TerrainGenerator.Wfc.BuiltInMaps";
     private const string UserMapsKey = "Ximsa.TerrainGenerator.Wfc.UserMaps";
-    private const string SeedKey = "Ximsa.TerrainGenerator.Noise3D.Seed";
-    private const string RandomSeedKey = "Ximsa.TerrainGenerator.Noise3D.RandomSeed";
     private const string SolidThresholdKey = "Ximsa.TerrainGenerator.Wfc.SolidThreshold";
     private const string BlockSizeKey = "Ximsa.TerrainGenerator.Wfc.BlockSize";
     private const string PatternSizeKey = "Ximsa.TerrainGenerator.Wfc.PatternSize";
@@ -34,13 +31,10 @@ public class WfcGeneratorDialog : TerrainJobDialog
     // checked by default, besides the current map
     private const string DefaultBuiltInMap = "Diorama";
 
-    private static readonly Random SeedRandom = new();
-
     private readonly VisualElement generateButton;
     private readonly MapRepository mapRepository;
-    private readonly TextField seedField;
     private readonly HashSet<MapFileReference> selectedMaps = new();
-    private readonly WfcSettings settings = new() { Seed = SeedRandom.Next(100000) };
+    private readonly WfcSettings settings = new();
     private bool useCurrentMap = true;
 
     public WfcGeneratorDialog(ILoc loc, MapEditorService mapEditorService, MapRepository mapRepository,
@@ -73,14 +67,6 @@ public class WfcGeneratorDialog : TerrainJobDialog
         Content.AddButton(loc.T(MoreMapsKey), MoreMapsKey, () => moreMaps.SetDisplay(moreMapsShown = !moreMapsShown));
         Content.Add(moreMaps);
 
-        Content.AddLabel(loc.T(SeedKey), SeedKey);
-        seedField = Content.AddTextField(SeedKey, OnSeedChanged);
-        seedField.SetValueWithoutNotify(settings.Seed.ToString());
-        Content.AddButton(loc.T(RandomSeedKey), RandomSeedKey, () =>
-        {
-            settings.Seed = SeedRandom.Next(100000);
-            seedField.SetValueWithoutNotify(settings.Seed.ToString());
-        });
         Content.Add(new GameSlider()
             .SetLabel(loc.T(SolidThresholdKey))
             .SetHorizontalSlider(new SliderValues<float>(0.05f, 1, (float)settings.SolidThreshold))
@@ -135,16 +121,11 @@ public class WfcGeneratorDialog : TerrainJobDialog
         generateButton?.SetEnabled(useCurrentMap || selectedMaps.Count > 0);
     }
 
-    private void OnSeedChanged(string text)
-    {
-        if (int.TryParse(text, out var seed))
-            settings.Seed = seed;
-    }
-
     private void OnGenerate()
     {
-        // snapshot, so changing settings while the job runs does not affect it
+        // snapshot, so changing settings while the job runs does not affect it; every run gets a new seed
         var jobSettings = settings.Clone();
+        jobSettings.Seed = unchecked((int)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
         var useCurrent = useCurrentMap;
         // maps are read through the game's MapRepository (Unity assets), so on the main thread;
         // their bytes are parsed in the background
