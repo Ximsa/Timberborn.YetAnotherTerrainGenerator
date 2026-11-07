@@ -42,7 +42,7 @@ public class MapEditorService
         var worldBlocksArray = worldBlocks!.GetFieldValue<WorldBlock[,,]>("_values");
         foreach (var worldBlock in worldBlocksArray!)
         {
-            var blockObjects = worldBlock.BlockObjects.Where(x => x.GetComponentFast<EntityComponent>() != null)
+            var blockObjects = worldBlock.BlockObjects.Where(x => x.HasComponent<EntityComponent>())
                 .ToArray();
             foreach (var block in blockObjects) entityService.Delete(block);
         }
@@ -83,7 +83,7 @@ public class MapEditorService
         for (var i = 0; i < MapSize.y; i++)
         for (var j = 0; j < MapSize.x; j++)
         {
-            var height = terrainService.CellHeight(new Vector2Int(j, i));
+            var height = terrainService.GetAllHeightsInCell(new Vector2Int(j, i)).Select(x => x.z).DefaultIfEmpty(0).Max();
             var targetHeight = (int)heightmap[i, j];
             if (height > targetHeight)
                 terrainService.UnsetTerrain(new Vector3Int(j, i, height), height - targetHeight + 1);

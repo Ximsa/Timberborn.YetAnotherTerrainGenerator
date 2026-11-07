@@ -6,23 +6,33 @@
         <Nullable>enable</Nullable>
         <LangVersion>10</LangVersion>
     </PropertyGroup>
+
+    <PropertyGroup>
+        <TimberbornDir>F:\GOG\Timberborn</TimberbornDir>
+        <TimberbornManagedDir>$(TimberbornDir)\Timberborn_Data\Managed</TimberbornManagedDir>
+        <TimberbornModsDir>C:\Users\monik\OneDrive\Dokumente\Timberborn\Mods</TimberbornModsDir>
+    </PropertyGroup>
+
     <ItemGroup>
-        <Reference Include="G:\GOG Games\Timberborn\Timberborn_Data\Managed\publicized_assemblies\T*.dll"/>
-        <Reference Include="G:\GOG Games\Timberborn\Timberborn_Data\Managed\publicized_assemblies\U*.dll"/>
-        <Reference Include="G:\GOG Games\Timberborn\Timberborn_Data\Managed\publicized_assemblies\B*.dll"/>
-        <Reference Include="G:\GOG Games\Timberborn\Timberborn_Data\Managed\System.Collections.Immutable.dll"/>
+        <Reference Include="$(TimberbornManagedDir)\T*.dll" Private="false" Publicize="true"/>
+        <Reference Include="$(TimberbornManagedDir)\U*.dll" Private="false"/>
+        <Reference Include="$(TimberbornManagedDir)\B*.dll" Private="false"/>
+        <Reference Include="$(TimberbornManagedDir)\System.Collections.Immutable.dll" Private="false"/>
     </ItemGroup>
 
     <ItemGroup>
         <Reference Include="0Harmony">
-            <HintPath>D:\OneDrive\Dokumente\Timberborn\Mods\harmony_4149561_2.3.3\0Harmony.dll</HintPath>
+            <HintPath>$(TimberbornModsDir)\Harmony\0Harmony.dll</HintPath>
+            <Private>false</Private>
         </Reference>
         <Reference Include="TimberUi">
-            <HintPath>D:\OneDrive\Dokumente\Timberborn\Mods\timberui_4764523_7.2.0\version-0.7\TimberUi.dll</HintPath>
+            <HintPath>$(TimberbornModsDir)\timberui-1y6n\version-1.1\TimberUi.dll</HintPath>
+            <Private>false</Private>
         </Reference>
     </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="NumSharp" Version="0.30.0"/>
+        <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.3" PrivateAssets="all"/>
     </ItemGroup>
 </Project>
