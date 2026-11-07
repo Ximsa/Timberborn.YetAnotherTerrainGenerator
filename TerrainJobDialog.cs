@@ -11,7 +11,7 @@ namespace Timberborn.TerrainGenerator;
 
 // Dialog that computes new terrain on a background thread and then applies it to the map
 // over several frames, showing a progress bar for both phases. The computation can be cancelled;
-// applying cannot, so the map is never left half changed.
+// applying cannot, so the map is never left half changed. Each applied job is one step of the map editor's undo.
 public abstract class TerrainJobDialog : DialogBoxElement
 {
     protected const string LoadingModelsKey = "Ximsa.TerrainGenerator.Progress.LoadingModels";
@@ -94,6 +94,8 @@ public abstract class TerrainJobDialog : DialogBoxElement
             applying = true;
             cancelButton.SetDisplay(false);
             progress = new ProgressReporter();
+            // everything this job changes becomes one undo step: close whatever was pending before it
+            mapEditorService.CommitUndoStep();
             if (changedColumns == null)
                 mapEditorService.RemoveAllEntityComponents();
             else
@@ -116,6 +118,9 @@ public abstract class TerrainJobDialog : DialogBoxElement
         }
         finally
         {
+            // also after a failure, so a partly applied change can be undone
+            if (applying)
+                mapEditorService.CommitUndoStep();
             refresh.Pause();
             cancelButton.SetDisplay(false);
             cancellation.Dispose();

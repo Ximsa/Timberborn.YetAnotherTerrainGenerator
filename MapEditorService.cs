@@ -7,6 +7,7 @@ using Timberborn.MapEditorSceneLoading;
 using Timberborn.MapIndexSystem;
 using Timberborn.MapRepositorySystem;
 using Timberborn.TerrainSystem;
+using Timberborn.UndoSystem;
 using UnityEngine;
 
 namespace Timberborn.TerrainGenerator;
@@ -20,11 +21,14 @@ public class MapEditorService
     private readonly MapPersistenceController mapPersistenceController;
     private readonly TerrainMap terrainMap;
     private readonly ITerrainService terrainService;
+    private readonly IUndoRegistry undoRegistry;
 
     public MapEditorService(BlockService blockService, EntityService entityService,
         MapEditorSceneLoader mapEditorSceneLoader, MapIndexService mapIndexService,
-        MapPersistenceController mapPersistenceController, TerrainMap terrainMap, ITerrainService terrainService)
+        MapPersistenceController mapPersistenceController, TerrainMap terrainMap, ITerrainService terrainService,
+        IUndoRegistry undoRegistry)
     {
+        this.undoRegistry = undoRegistry;
         this.blockService = blockService;
         this.entityService = entityService;
         this.mapEditorSceneLoader = mapEditorSceneLoader;
@@ -35,6 +39,13 @@ public class MapEditorService
     }
 
     public Vector3Int MapSize => terrainService.Size;
+
+    // the game records every terrain and entity change as a pending undo entry; committing closes the pending
+    // entries into one step of the map editor's undo (Ctrl+Z), like the game's brushes do after each stroke
+    public void CommitUndoStep()
+    {
+        undoRegistry.CommitStack();
+    }
 
     public void RemoveAllEntityComponents()
     {

@@ -71,6 +71,9 @@ folders. Restart the game after deploying.
   `ProgressReporter` with localization keys as stage names), then apply on the main thread spread over frames.
   Generators remove all entities; terrain tools pass `removeAllEntities: false` to remove only entities in changed
   columns. Spawning trees or water sources goes in `placeEntities`, which also runs over frames.
+- Undo: the game records every terrain change made through `ITerrainService` and every entity created or deleted
+  as pending undo entries; `RunJob` commits them (`MapEditorService.CommitUndoStep`) before and after applying, so
+  each tool action is one Ctrl+Z step. Do not write terrain or entities around these services, or undo misses it.
 - Read game state (terrain, water, maps through `MapRepository`) on the main thread before handing off to a
   background task.
 - Grouped tool buttons show their name through `IToolDescriptor`; hover tooltips only work on groupless buttons.
