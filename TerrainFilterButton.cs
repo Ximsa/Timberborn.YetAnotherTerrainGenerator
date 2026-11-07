@@ -22,6 +22,6 @@ public class TerrainFilterButton : GrouplessBottomBarButton
             new TerrainFilterDialog(loc, mapEditorService).Show(
                 visualElementInitializer,
                 panelStack);
-        BottomText = "Global Terrain Filter";
+        TooltipText = "Global Terrain Filter";
     }
 }

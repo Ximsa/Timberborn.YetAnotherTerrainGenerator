@@ -20,7 +20,7 @@ public abstract class GrouplessBottomBarButton : IBottomBarElementsProvider
     }
 
     protected string SpritePath { get; set; } = string.Empty;
-    protected string BottomText { get; set; } = string.Empty;
+    protected string TooltipText { get; set; } = string.Empty;
     protected Action Click { get; set; } = () => { };
 
     public IEnumerable<BottomBarElement> GetElements()
@@ -30,7 +30,14 @@ public abstract class GrouplessBottomBarButton : IBottomBarElementsProvider
         root.Q<VisualElement>("ToolImage").style.backgroundImage =
             new StyleBackground(assetLoader.Load<Sprite>(SpritePath));
         root.Q<Button>("ToolButton").RegisterCallback<ClickEvent>(_ => Click());
-        root.Q<TextElement>("BottomText").text = BottomText;
+        root.Q<TextElement>("BottomText").ToggleDisplayStyle(false);
+
+        // shown only while hovering, like the game's own bottom bar buttons
+        var tooltip = root.Q<Label>("Tooltip");
+        tooltip.text = TooltipText;
+        tooltip.ToggleDisplayStyle(false);
+        root.RegisterCallback<MouseOverEvent>(_ => tooltip.ToggleDisplayStyle(true));
+        root.RegisterCallback<MouseOutEvent>(_ => tooltip.ToggleDisplayStyle(false));
         yield return BottomBarElement.CreateSingleLevel(root);
     }
 }

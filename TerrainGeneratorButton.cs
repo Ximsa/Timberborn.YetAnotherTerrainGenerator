@@ -22,6 +22,6 @@ public class TerrainGeneratorButton : GrouplessBottomBarButton
             new TerrainGeneratorDialog(loc, mapEditorService).Show(
                 visualElementInitializer,
                 panelStack);
-        BottomText = "Terrain Generator";
+        TooltipText = "Terrain Generator";
     }
 }
