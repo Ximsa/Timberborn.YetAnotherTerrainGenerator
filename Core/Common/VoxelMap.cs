@@ -29,6 +29,17 @@ public sealed class VoxelMap
         set => Voxels[(z * SizeY + y) * SizeX + x] = value;
     }
 
+    // solid voxels per column, indexed y * SizeX + x
+    public float[] SolidPerColumn()
+    {
+        var counts = new float[SizeX * SizeY];
+        for (var z = 0; z < SizeZ; z++)
+        for (var i = 0; i < counts.Length; i++)
+            if (Voxels[z * counts.Length + i])
+                counts[i]++;
+        return counts;
+    }
+
     public int CountSolid()
     {
         return Voxels.Count(voxel => voxel);

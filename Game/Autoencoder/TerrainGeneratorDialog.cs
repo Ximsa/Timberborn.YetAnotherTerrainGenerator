@@ -1,4 +1,3 @@
-using NumSharp;
 using Timberborn.Localization;
 using Timberborn.TerrainGenerator.Core.Autoencoder;
 using Timberborn.TerrainGenerator.Core.Common;
@@ -68,7 +67,7 @@ public class TerrainGeneratorDialog : TerrainJobDialog
                 _ => AutoencoderGenerator.Load(Path.Combine(ModStarter.OriginPath, "Models")));
             var random = new Random();
             // the current map as solid voxels per column
-            var current = terrain.astype(np.float32).sum(0).flatten().ToArray<float>();
+            var current = VoxelMap.FromTerrain(terrain).SolidPerColumn();
             var decoded = progress.Stage(DecodingKey, 0.05f, 0.15f, _ =>
             {
                 var latent = generator.Sample(generator.Encode(current, mapSize.x, mapSize.y), jobSettings, random);
