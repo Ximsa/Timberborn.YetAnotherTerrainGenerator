@@ -2,7 +2,6 @@ using Timberborn.Localization;
 using Timberborn.TerrainGenerator.TerrainTools;
 using TimberUi.CommonUi;
 using UnityEngine.UIElements;
-using Random = System.Random;
 
 namespace Timberborn.TerrainGenerator;
 
@@ -15,18 +14,13 @@ public class TreePlacementDialog : TerrainJobDialog
     private const string DensityKey = "Ximsa.TerrainGenerator.TreePlacement.Density";
     private const string TreeSpeciesKey = "Ximsa.TerrainGenerator.TreePlacement.TreeSpecies";
     private const string BushSpeciesKey = "Ximsa.TerrainGenerator.TreePlacement.BushSpecies";
-    private const string SeedKey = "Ximsa.TerrainGenerator.Noise3D.Seed";
-    private const string RandomSeedKey = "Ximsa.TerrainGenerator.Noise3D.RandomSeed";
     private const string ApplyKey = "Ximsa.TerrainGenerator.Apply";
     private const string ChoosingKey = "Ximsa.TerrainGenerator.Progress.ChoosingPlants";
-
-    private static readonly Random SeedRandom = new();
 
     private readonly VisualElement applyButton;
     private readonly IReadOnlyList<Species> bushes;
     private readonly EntityPlacer entityPlacer;
-    private readonly TextField seedField;
-    private readonly TreePlacerSettings settings = new() { Seed = SeedRandom.Next(100000) };
+    private readonly TreePlacerSettings settings = new();
     private readonly IReadOnlyList<Species> trees;
 
     public TreePlacementDialog(ILoc loc, MapEditorService mapEditorService, EntityPlacer entityPlacer) :
@@ -38,14 +32,6 @@ public class TreePlacementDialog : TerrainJobDialog
         settings.TreeWeights = trees.Select(_ => 1.0).ToArray();
         settings.BushWeights = bushes.Select(_ => 1.0).ToArray();
         SetTitle(loc.T(TitleKey));
-        Content.AddLabel(loc.T(SeedKey), SeedKey);
-        seedField = Content.AddTextField(SeedKey, OnSeedChanged);
-        seedField.SetValueWithoutNotify(settings.Seed.ToString());
-        Content.AddButton(loc.T(RandomSeedKey), RandomSeedKey, () =>
-        {
-            settings.Seed = SeedRandom.Next(100000);
-            seedField.SetValueWithoutNotify(settings.Seed.ToString());
-        });
         AddPercentSlider(ForestCoverageKey, settings.ForestCoverage, value => settings.ForestCoverage = value);
         AddPercentSlider(BushCoverageKey, settings.BushCoverage, value => settings.BushCoverage = value);
         Content.Add(new GameSliderInt()
@@ -85,16 +71,12 @@ public class TreePlacementDialog : TerrainJobDialog
         }
     }
 
-    private void OnSeedChanged(string text)
-    {
-        if (int.TryParse(text, out var seed))
-            settings.Seed = seed;
-    }
-
     private void OnApply()
     {
-        // snapshot, so changing settings while the job runs does not affect it; water is read on the main thread
+        // snapshot, so changing settings while the job runs does not affect it; every run gets a new seed; water is
+        // read on the main thread
         var jobSettings = settings.Clone();
+        jobSettings.Seed = unchecked((int)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
         var water = entityPlacer.WaterTiles();
         IReadOnlyList<Plant> plants = Array.Empty<Plant>();
         RunJob(applyButton, (terrain, mapSize, progress) =>

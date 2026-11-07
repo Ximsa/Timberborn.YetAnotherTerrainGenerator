@@ -2,7 +2,6 @@ using Timberborn.Localization;
 using Timberborn.TerrainGenerator.TerrainTools;
 using TimberUi.CommonUi;
 using UnityEngine.UIElements;
-using Random = System.Random;
 
 namespace Timberborn.TerrainGenerator;
 
@@ -13,31 +12,18 @@ public class RiverCarverDialog : TerrainJobDialog
     private const string WidthKey = "Ximsa.TerrainGenerator.RiverCarver.Width";
     private const string LakeSizeKey = "Ximsa.TerrainGenerator.RiverCarver.LakeSize";
     private const string SourceStrengthKey = "Ximsa.TerrainGenerator.RiverCarver.SourceStrength";
-    private const string SeedKey = "Ximsa.TerrainGenerator.Noise3D.Seed";
-    private const string RandomSeedKey = "Ximsa.TerrainGenerator.Noise3D.RandomSeed";
     private const string ApplyKey = "Ximsa.TerrainGenerator.Apply";
     private const string CarvingKey = "Ximsa.TerrainGenerator.Progress.Carving";
 
-    private static readonly Random SeedRandom = new();
-
     private readonly VisualElement applyButton;
     private readonly EntityPlacer entityPlacer;
-    private readonly TextField seedField;
-    private readonly RiverCarverSettings settings = new() { Seed = SeedRandom.Next(100000) };
+    private readonly RiverCarverSettings settings = new();
 
     public RiverCarverDialog(ILoc loc, MapEditorService mapEditorService, EntityPlacer entityPlacer) :
         base(loc, mapEditorService)
     {
         this.entityPlacer = entityPlacer;
         SetTitle(loc.T(TitleKey));
-        Content.AddLabel(loc.T(SeedKey), SeedKey);
-        seedField = Content.AddTextField(SeedKey, OnSeedChanged);
-        seedField.SetValueWithoutNotify(settings.Seed.ToString());
-        Content.AddButton(loc.T(RandomSeedKey), RandomSeedKey, () =>
-        {
-            settings.Seed = SeedRandom.Next(100000);
-            seedField.SetValueWithoutNotify(settings.Seed.ToString());
-        });
         Content.Add(new GameSliderInt()
             .SetLabel(loc.T(RiversKey))
             .SetHorizontalSlider(new SliderValues<int>(1, 10, settings.Rivers))
@@ -63,16 +49,11 @@ public class RiverCarverDialog : TerrainJobDialog
         AddCloseButton();
     }
 
-    private void OnSeedChanged(string text)
-    {
-        if (int.TryParse(text, out var seed))
-            settings.Seed = seed;
-    }
-
     private void OnApply()
     {
-        // snapshot, so changing settings while the job runs does not affect it
+        // snapshot, so changing settings while the job runs does not affect it; every run gets a new seed
         var jobSettings = settings.Clone();
+        jobSettings.Seed = unchecked((int)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
         IReadOnlyList<RiverHead> heads = Array.Empty<RiverHead>();
         RunJob(applyButton, (terrain, mapSize, progress) =>
         {
