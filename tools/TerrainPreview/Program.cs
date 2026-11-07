@@ -16,7 +16,7 @@ using TerrainPreview;
 //   TerrainPreview threshold-sweep --sources a.timber,b.timber [--size 128x128x23] [--seed 1] [--start 0] --out-dir <dir>
 //   TerrainPreview map <file.timber> --out preview.png
 //   TerrainPreview sharpen <file.timber> [--region 4] [--min-area 32] [--step 2] [--strength 0.5] --out preview.png
-//   TerrainPreview rivers <file.timber> [--rivers 3] [--width 3] [--head 4] [--basin 500] [--seed 1] [--sharpen false]
+//   TerrainPreview rivers <file.timber> [--rivers 3] [--width 3] [--head 4] [--basin 500] [--fill 64] [--seed 1] [--sharpen false]
 //       --out preview.png
 //   TerrainPreview trees <file.timber> [--rivers 0] [--forest 0.35] [--bush 0.12] [--patch 32] [--clump 6]
 //       [--density 0.5] [--seed 1] [--sharpen false] --out preview.png
@@ -197,6 +197,7 @@ switch (args[0])
             Width = int.Parse(options.GetValueOrDefault("width", "3")),
             HeadDistance = int.Parse(options.GetValueOrDefault("head", "4")),
             MaxBasinVolume = int.Parse(options.GetValueOrDefault("basin", "500")),
+            FillDipArea = int.Parse(options.GetValueOrDefault("fill", "64")),
             Seed = seed
         };
         var carver = new RiverCarver(riverSettings, before.SizeX, before.SizeY);

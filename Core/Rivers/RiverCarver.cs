@@ -16,6 +16,10 @@ public sealed class RiverCarverSettings
     // water; then the river tunnels out towards the nearest map edge or lower ground
     public int MaxBasinVolume = 500;
 
+    // dips on a river's path with fewer tiles than this below their rim are filled with ground up to the rim, so the
+    // river flows straight across instead of forming a pond
+    public int FillDipArea = 64;
+
     // strength of the water source at each river head
     public float SourceStrength = 1.5f;
 
@@ -91,14 +95,16 @@ public sealed class RiverCarver
         var openCourses = new List<(List<int> Course, HashSet<int> Tunnelled)>();
         // tiles on an earlier river's course; a later river that reaches one joins it
         var courses = new bool[heights.Length];
+        // the original ground, raised where dips on a river's path were filled; beds cut at most one block below it
+        var ground = (int[])heights.Clone();
         var climbSurface = Smooth(heights);
         tunnelNoise = SmoothNoise(random, 3);
         for (var river = 0; river < settings.Rivers; river++)
         {
             var head = FindHead(random, result, climbSurface);
             if (head < 0) break;
-            var (course, tunnelled, basins) = TraceCourse(head, result, courses);
-            CarveCourse(course, tunnelled, heights, result);
+            var (course, tunnelled, basins) = TraceCourse(head, result, courses, ground);
+            CarveCourse(course, tunnelled, ground, result);
             foreach (var tile in basins) Water[tile] = true;
             foreach (var tile in course) courses[tile] = true;
             Heads.Add(new RiverHead(head % sizeX, head / sizeX, result[head]));
@@ -191,7 +197,7 @@ public sealed class RiverCarver
 
     // the river's tiles from head to mouth, which of them are tunnelled, and the tiles of the basins it fills
     private (List<int> Course, HashSet<int> Tunnelled, List<int> Basins) TraceCourse(int head, int[] heights,
-        bool[] courses)
+        bool[] courses, int[] ground)
     {
         var course = new List<int> { head };
         var onCourse = new HashSet<int> { head };
@@ -208,6 +214,18 @@ public sealed class RiverCarver
             {
                 Add(next);
                 tile = next;
+                continue;
+            }
+
+            // a small dip: fill it with ground up to its rim and flow on from where it spills over
+            var dip = SmallDip(tile, heights, onCourse, courses);
+            if (dip != null)
+            {
+                var (spillPath, dipTiles, rim) = dip.Value;
+                foreach (var dipTile in dipTiles)
+                    heights[dipTile] = ground[dipTile] = Math.Max(heights[dipTile], rim);
+                foreach (var step in spillPath) Add(step);
+                tile = course[course.Count - 1];
                 continue;
             }
 
@@ -247,6 +265,42 @@ public sealed class RiverCarver
             course.Add(step);
             onCourse.Add(step);
         }
+    }
+
+    // floods from start lowest first up to where the water first spills over the rim (or reaches a map edge or
+    // another river). Returns the path there, the tiles below the rim and the rim height if fewer than FillDipArea tiles
+    // lie below the rim; null for a bigger basin
+    private (List<int> SpillPath, List<int> Tiles, int Rim)? SmallDip(int start, int[] heights, HashSet<int> onCourse,
+        bool[] courses)
+    {
+        if (settings.FillDipArea <= 0) return null;
+        var parent = new Dictionary<int, int> { [start] = start };
+        var steps = new Dictionary<int, int> { [start] = 0 };
+        var queue = new TileQueue();
+        queue.Push(start, Priority(heights[start], 0));
+        var level = heights[start];
+        var flooded = new List<int>();
+        while (queue.TryPop(out var tile, out _))
+        {
+            var height = heights[tile];
+            if (height < level || (tile != start && (IsEdge(tile) || courses[tile])))
+                return (PathTo(tile, parent), flooded.Where(t => heights[t] < level).ToList(), level);
+            level = height;
+            flooded.Add(tile);
+            // flats at the rim's height count towards the search, so a wide plateau ends it too
+            if (flooded.Count(t => heights[t] < level) >= settings.FillDipArea ||
+                flooded.Count >= 8 * settings.FillDipArea)
+                return null;
+            foreach (var neighbour in NeighboursOf(tile))
+                if (!parent.ContainsKey(neighbour) && !onCourse.Contains(neighbour))
+                {
+                    parent[neighbour] = tile;
+                    steps[neighbour] = steps[tile] + 1;
+                    queue.Push(neighbour, Priority(heights[neighbour], steps[neighbour]));
+                }
+        }
+
+        return null;
     }
 
     // floods from start lowest first: the water keeps rising, spreading over low rims into neighbouring low ground,

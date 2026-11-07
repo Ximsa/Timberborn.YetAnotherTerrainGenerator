@@ -113,7 +113,9 @@ The terrain tools work on a heightmap, but must not destroy 3D terrain:
   terrace flats do not stall it) to a local top, and put the head on the climbed path a set number of tiles before
   the top (head distance, default 4). Of 50 random starts the one with the biggest climb wins (heads on small bumps
   gave rivers of a few tiles); heads within a sixth of the map from the edge, or near earlier heads, are skipped.
-- Course: from the head, follow steepest descent; at a pit or flat the water rises lowest first (ties broken by
+- Dips: at a pit, a dip with fewer tiles below its rim than the fill threshold (default 64, 0 = off) is filled with
+  ground up to the rim and the river flows straight across (ground is raised, so the bed is cut from the new ground).
+- Course: from the head, follow steepest descent; at a pit or flat that is not a small dip the water rises lowest first (ties broken by
   distance), spreading over low rims into neighbouring low ground, until the basin holds the largest basin volume
   (voxels of water, default 500). Then the river tunnels out from the pit at its bed height to the nearest way out,
   a map edge or ground at or below the bed, whichever the cheapest path reaches first (both count equally); each tile
@@ -128,8 +130,8 @@ The terrain tools work on a heightmap, but must not destroy 3D terrain:
   ground below, e.g. on a slope near the peak), at the first tile downstream (outside tunnels) where it fits.
 - Settings: number of rivers (1..4, default 1), width, head distance (0..16, default 4), largest basin volume
   (50..5000 voxels of water, default
-  500), water source strength. One progress stage.
-- Offline preview: `TerrainPreview rivers <file.timber> [--head 4] [--basin 500]`, or `--rivers N` after any
+  500), dip fill threshold (0..256 tiles, default 64), water source strength. One progress stage.
+- Offline preview: `TerrainPreview rivers <file.timber> [--head 4] [--basin 500] [--fill 64]`, or `--rivers N` after any
   map-producing command (e.g. `noise3d`). Water is drawn blue, tunnels purple, heads red.
 
 ### Phase 4: Tree Placement

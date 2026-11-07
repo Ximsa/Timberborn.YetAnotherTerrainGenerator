@@ -64,6 +64,7 @@ Ximsa.TerrainGenerator.Tool.RiverCarver.Description,"Carves rivers that start a 
 Ximsa.TerrainGenerator.RiverCarver.Rivers,"Number of rivers",-
 Ximsa.TerrainGenerator.RiverCarver.Width,"River width (tiles)",-
 Ximsa.TerrainGenerator.RiverCarver.MaxBasinVolume,"Largest basin volume (voxels of water) before tunnelling out",-
+Ximsa.TerrainGenerator.RiverCarver.FillDipArea,"Fill dips on the river's path smaller than (tiles)",-
 Ximsa.TerrainGenerator.RiverCarver.HeadDistance,"River head: tiles before the peak",-
 Ximsa.TerrainGenerator.RiverCarver.SourceStrength,"Water source strength",-
 Ximsa.TerrainGenerator.Progress.Carving,"Carving rivers",-

@@ -15,6 +15,7 @@ public class RiverCarverDialog : TerrainJobDialog
     private const string WidthKey = "Ximsa.TerrainGenerator.RiverCarver.Width";
     private const string HeadDistanceKey = "Ximsa.TerrainGenerator.RiverCarver.HeadDistance";
     private const string MaxBasinVolumeKey = "Ximsa.TerrainGenerator.RiverCarver.MaxBasinVolume";
+    private const string FillDipAreaKey = "Ximsa.TerrainGenerator.RiverCarver.FillDipArea";
     private const string SourceStrengthKey = "Ximsa.TerrainGenerator.RiverCarver.SourceStrength";
     private const string ApplyKey = "Ximsa.TerrainGenerator.Apply";
     private const string CarvingKey = "Ximsa.TerrainGenerator.Progress.Carving";
@@ -47,6 +48,11 @@ public class RiverCarverDialog : TerrainJobDialog
             .SetLabel(loc.T(MaxBasinVolumeKey))
             .SetHorizontalSlider(new SliderValues<int>(50, 5000, settings.MaxBasinVolume))
             .RegisterChange(maxBasinVolume => settings.MaxBasinVolume = maxBasinVolume)
+            .AddEndLabel(value => $"{value}"));
+        Content.Add(new GameSliderInt()
+            .SetLabel(loc.T(FillDipAreaKey))
+            .SetHorizontalSlider(new SliderValues<int>(0, 256, settings.FillDipArea))
+            .RegisterChange(fillDipArea => settings.FillDipArea = fillDipArea)
             .AddEndLabel(value => $"{value}"));
         Content.Add(new GameSlider()
             .SetLabel(loc.T(SourceStrengthKey))
