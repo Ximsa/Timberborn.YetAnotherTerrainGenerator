@@ -19,7 +19,7 @@ A second bottom-bar button group, **Terrain Tools**, built with the same group c
 | 2 Cliff Sharpening | Built and previewed offline; not yet tested in game |
 | 3 River Carver | Built (dialog, water sources) and previewed offline; not yet tested in game |
 | 4 Tree Placement | Built (dialog, spawning) and previewed offline; not yet tested in game |
-| 5 Polish and release | 1.3.0 in `release/version-1.1`, placeholder icons for all tools, texts done; in-game testing still to do |
+| 5 Polish and release | 1.3.1 in `release/version-1.1`, placeholder icons for all tools, texts done; in-game testing still to do |
 
 ## Decisions
 
