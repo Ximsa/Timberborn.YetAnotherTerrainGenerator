@@ -26,12 +26,11 @@ public abstract class GrouplessBottomBarButton : IBottomBarElementsProvider
     public IEnumerable<BottomBarElement> GetElements()
     {
         var root = visualElementLoader.LoadVisualElement("Common/BottomBar/GrouplessToolButton");
-        var button = root.Q<VisualElement>("ToolButton");
-        button.AddToClassList("bottom-bar-button--red");
-        button.RegisterCallback<ClickEvent>(_ => Click());
+        root.AddToClassList("bottom-bar-button--red");
         root.Q<VisualElement>("ToolImage").style.backgroundImage =
             new StyleBackground(assetLoader.Load<Sprite>(SpritePath));
-        root.Q<Label>("BottomText").text = BottomText;
+        root.Q<Button>("ToolButton").RegisterCallback<ClickEvent>(_ => Click());
+        root.Q<TextElement>("BottomText").text = BottomText;
         yield return BottomBarElement.CreateSingleLevel(root);
     }
 }
