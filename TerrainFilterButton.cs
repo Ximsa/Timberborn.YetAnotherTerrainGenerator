@@ -1,27 +1,35 @@
 using Timberborn.AssetSystem;
-using Timberborn.CoreUI;
+using Timberborn.BottomBarSystem;
 using Timberborn.Localization;
-
+using Timberborn.ToolButtonSystem;
+using UnityEngine;
 
 namespace Timberborn.TerrainGenerator;
 
-public class TerrainFilterButton : GrouplessBottomBarButton
+// Standalone bottom bar button for terrain smoothing, built like the game's own groupless tool buttons.
+public class TerrainFilterButton : IBottomBarElementsProvider
 {
-    public TerrainFilterButton(
-        VisualElementInitializer visualElementInitializer,
-        PanelStack panelStack,
-        VisualElementLoader visualElementLoader,
-        IAssetLoader assetLoader,
-        MapEditorService mapEditorService,
-        ILoc loc
-    ) :
-        base(visualElementLoader, assetLoader)
+    private const string SpritePath = "Sprites/terrain-smoothing-button";
+
+    private readonly IAssetLoader assetLoader;
+    private readonly ILoc loc;
+    private readonly TerrainSmoothingTool terrainSmoothingTool;
+    private readonly ToolButtonFactory toolButtonFactory;
+
+    public TerrainFilterButton(ToolButtonFactory toolButtonFactory, IAssetLoader assetLoader, ILoc loc,
+        TerrainSmoothingTool terrainSmoothingTool)
     {
-        SpritePath = "Sprites/terrain-smoothing-button";
-        Click = () =>
-            new TerrainFilterDialog(loc, mapEditorService).Show(
-                visualElementInitializer,
-                panelStack);
-        TooltipText = "Global Terrain Filter";
+        this.toolButtonFactory = toolButtonFactory;
+        this.assetLoader = assetLoader;
+        this.loc = loc;
+        this.terrainSmoothingTool = terrainSmoothingTool;
+    }
+
+    public IEnumerable<BottomBarElement> GetElements()
+    {
+        var button = toolButtonFactory.CreateGrouplessGreen(terrainSmoothingTool,
+            assetLoader.Load<Sprite>(SpritePath));
+        button.InitializeTooltip(loc.T(terrainSmoothingTool.NameLocKey));
+        yield return BottomBarElement.CreateSingleLevel(button.Root);
     }
 }

@@ -7,16 +7,17 @@ namespace Timberborn.TerrainGenerator;
 
 public class AutoencoderGeneratorTool : DialogTool
 {
-    private readonly ILoc loc;
     private readonly MapEditorService mapEditorService;
 
     public AutoencoderGeneratorTool(VisualElementInitializer visualElementInitializer, PanelStack panelStack,
         ToolService toolService, ILoc loc, MapEditorService mapEditorService) :
-        base(visualElementInitializer, panelStack, toolService)
+        base(visualElementInitializer, panelStack, toolService, loc)
     {
-        this.loc = loc;
         this.mapEditorService = mapEditorService;
     }
+
+    public override string NameLocKey => "Ximsa.TerrainGenerator.Tool.Autoencoder";
+    protected override string DescriptionLocKey => "Ximsa.TerrainGenerator.Tool.Autoencoder.Description";
 
     protected override DialogBoxElement CreateDialog()
     {

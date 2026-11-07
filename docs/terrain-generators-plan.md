@@ -54,6 +54,34 @@ The noise is sampled at the scaled coordinates, rather than generating a full be
 4. **Reading other maps.** Load built-in maps (e.g. Diorama, Cliffside) and user maps through `MapRepository`/`MapDeserializer`
    and decode their terrain voxels (the `TerrainMap` entry of the serialized world).
 
+#### Phase 0 results (2026-11-07)
+
+1. **3D voxels.** Terrain is stored as a full 3D voxel grid (`TerrainMap`, saved as `Voxels`), so
+   overhangs and floating chunks can be stored. Writes must go through `ITerrainService`:
+   - `SetTerrain(z, n)` fills voxels z .. z+n-1 upwards; `UnsetTerrain(z, n)` removes z, z-1 .. z-n+1
+     downwards. Floating platforms, arches and holes under the surface all work and render.
+   - Writing directly into `TerrainMap.SetTerrain` changes the data but does not redraw the terrain,
+     because it skips the service's change events. Do not use it.
+   - On load, the game's `TerrainPhysicsPostLoader.Validate` deletes terrain (and buildings) that is not
+     connected to the ground. The mod skips it with a Harmony patch (`TerrainPhysicsPatches.cs`), in the
+     map editor and in the game. Confirmed: floating terrain now survives saving and reloading.
+     Live terrain physics (collapsing when support is removed) is unchanged.
+   - Grouped tool buttons show their name through `IToolDescriptor` (the game's description panel);
+     the hover label (`InitializeTooltip`) only works on groupless tool buttons.
+2. **Native tool group.** Works. `ToolGroups/ToolGroups.<Name>.blueprint.json` in the mod registers a
+   `ToolGroupSpec`; the group is built with `ToolGroupService.GetGroup`, `ToolGroupButtonFactory.CreateGreen`,
+   `ToolButtonFactory.Create`, `ToolButton.InitializeTooltip`, `ToolGroupButton.AddTool`,
+   `ToolGroupService.AssignToGroup` and `BottomBarElement.CreateMultiLevel`. Buttons are icon-only with
+   the name as hover tooltip.
+3. **Tool that opens a dialog.** `Enter` followed by `ToolService.SwitchToDefaultTool()` works without
+   errors. Confirmed with the Autoencoder Generator dialog.
+4. **Reading other maps.** Works for all 22 built-in maps and the user's maps (8-700 ms each) through
+   `MapRepository.OpenMap` and `MapVoxelReader` (zip + `world.json`: `MapSize.Size` and
+   `TerrainMap.Voxels.Array`, layer by layer from the bottom, x fastest). `MapDeserializer` is avoided
+   because it also replaces the game's current world data. Built-in names starting with `_`
+   (`_Mini`, `_TerrainTest`, `_WaterPerformanceTest`) are dev maps and are hidden from the WFC checklist.
+   Map heights differ (23 for built-in maps, up to 71 with Quadruple Terrain Bounds).
+
 ### Phase 1: Button group
 
 - Add the `ToolGroupSpec` blueprint, group icon and display name.

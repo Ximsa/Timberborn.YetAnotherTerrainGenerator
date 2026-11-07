@@ -27,4 +27,6 @@ Ximsa.TerrainGenerator.Progress.Done,"Done",-
 Ximsa.TerrainGenerator.Progress.Failed,"Failed",-
 Ximsa.TerrainGenerator.Group.Generators,"Terrain Generators",-
 Ximsa.TerrainGenerator.Tool.Autoencoder,"Autoencoder Generator",-
-Ximsa.TerrainGenerator.Tool.Phase0Checks,"Phase 0 checks (temporary)",-
+Ximsa.TerrainGenerator.Tool.Autoencoder.Description,"Generates new terrain from the current map with a neural autoencoder.",-
+Ximsa.TerrainGenerator.Tool.Smoothing,"Global Terrain Filter",-
+Ximsa.TerrainGenerator.Tool.Smoothing.Description,"Smooths the whole map with a median filter.",-

@@ -25,10 +25,10 @@ public class MapEditorConfigurator : Configurator
 {
     protected override void Configure()
     {
-        Bind<TerrainGeneratorButton>().AsTransient();
-        Bind<TerrainFilterButton>().AsTransient();
         Bind<MapEditorService>().AsSingleton();
-        MultiBind<BottomBarModule>().ToProvider<BottomBarModuleProvider<TerrainGeneratorButton>>().AsSingleton();
+
+        Bind<TerrainSmoothingTool>().AsSingleton();
+        Bind<TerrainFilterButton>().AsSingleton();
         MultiBind<BottomBarModule>().ToProvider<BottomBarModuleProvider<TerrainFilterButton>>().AsSingleton();
 
         Bind<AutoencoderGeneratorTool>().AsSingleton();

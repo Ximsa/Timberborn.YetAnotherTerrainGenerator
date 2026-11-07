@@ -1,6 +1,5 @@
 using Timberborn.AssetSystem;
 using Timberborn.BottomBarSystem;
-using Timberborn.Localization;
 using Timberborn.ToolButtonSystem;
 using Timberborn.ToolSystem;
 using UnityEngine;
@@ -12,35 +11,33 @@ namespace Timberborn.TerrainGenerator;
 public abstract class ToolGroupBottomBarButton : IBottomBarElementsProvider
 {
     private readonly IAssetLoader assetLoader;
-    private readonly ILoc loc;
     private readonly ToolButtonFactory toolButtonFactory;
     private readonly ToolGroupButtonFactory toolGroupButtonFactory;
     private readonly ToolGroupService toolGroupService;
 
     protected ToolGroupBottomBarButton(ToolGroupService toolGroupService,
         ToolGroupButtonFactory toolGroupButtonFactory, ToolButtonFactory toolButtonFactory,
-        IAssetLoader assetLoader, ILoc loc)
+        IAssetLoader assetLoader)
     {
         this.toolGroupService = toolGroupService;
         this.toolGroupButtonFactory = toolGroupButtonFactory;
         this.toolButtonFactory = toolButtonFactory;
         this.assetLoader = assetLoader;
-        this.loc = loc;
     }
 
     protected abstract string GroupId { get; }
 
-    protected abstract IEnumerable<(ITool Tool, string SpritePath, string TooltipLocKey)> Tools { get; }
+    // tools in a group show their name through IToolDescriptor (the game's description panel) when hovered
+    protected abstract IEnumerable<(ITool Tool, string SpritePath)> Tools { get; }
 
     public IEnumerable<BottomBarElement> GetElements()
     {
         var group = toolGroupService.GetGroup(GroupId);
         var groupButton = toolGroupButtonFactory.CreateGreen(group);
-        foreach (var (tool, spritePath, tooltipLocKey) in Tools)
+        foreach (var (tool, spritePath) in Tools)
         {
             var toolButton = toolButtonFactory.Create(tool, assetLoader.Load<Sprite>(spritePath),
                 groupButton.ToolButtonsElement);
-            toolButton.InitializeTooltip(loc.T(tooltipLocKey));
             groupButton.AddTool(toolButton);
             toolGroupService.AssignToGroup(group, tool);
         }

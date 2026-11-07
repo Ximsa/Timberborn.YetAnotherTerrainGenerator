@@ -4,19 +4,18 @@ using NumSharp;
 using Timberborn.MapRepositorySystem;
 using Timberborn.TerrainSystem;
 using Timberborn.ToolSystem;
+using Timberborn.ToolSystemUI;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
 namespace Timberborn.TerrainGenerator;
 
 // TEMPORARY (Phase 0 of docs/terrain-generators-plan.md): checks assumptions in game and logs the results.
-// First use writes test shapes at the map corner; later uses (e.g. after saving and reloading) only log them.
-public class Phase0ChecksTool : ITool
+// Every use first logs probe columns of the test shapes (to check they survived a save and reload),
+// then (re)writes the test shapes around the map centre.
+public class Phase0ChecksTool : ITool, IToolDescriptor
 {
     private const string Log = "[Phase0]";
-    private const int TestRow = 2;
-
-    private static bool shapesWritten;
 
     private readonly MapEditorService mapEditorService;
     private readonly MapRepository mapRepository;
@@ -48,6 +47,12 @@ public class Phase0ChecksTool : ITool
     {
     }
 
+    public ToolDescription DescribeTool()
+    {
+        return new ToolDescription.Builder("Phase 0 checks (temporary)")
+            .AddSection("Writes test shapes around the map centre and logs the results to Player.log.").Build();
+    }
+
     private static void Run(string name, Action check)
     {
         try
@@ -63,44 +68,83 @@ public class Phase0ChecksTool : ITool
     private void LogCurrentMap()
     {
         var terrain = mapEditorService.GetTerrain();
-        var solid = (int)(float)terrain.astype(np.float32).sum();
-        Debug.Log($"{Log} current map: size {terrainService.Size}, voxel grid {terrain.Shape}, solid {solid}");
+        Debug.Log($"{Log} current map: size {terrainService.Size}, voxel grid {terrain.Shape}, " +
+                  $"solid {terrain.astype(np.int32).sum()}");
     }
 
     private void CheckVoxelWrites()
     {
-        if (!shapesWritten)
+        var size = terrainService.Size;
+        var cx = size.x / 2;
+        var cy = size.y / 2;
+        if (size.x < 20 || size.y < 16)
         {
-            Debug.Log($"{Log} writing test shapes in row y={TestRow}, columns x=2..10");
-            Write(2, "service SetTerrain floating run (z=top+3, height 2)",
-                top => terrainService.SetTerrain(new Vector3Int(2, TestRow, top + 3), 2));
-            Write(4, "service UnsetTerrain under the surface (z=1, height 1)",
-                _ => terrainService.UnsetTerrain(new Vector3Int(4, TestRow, 1), 1));
-            Write(6, "service SetTerrain on top (z=top, height 3), control",
-                top => terrainService.SetTerrain(new Vector3Int(6, TestRow, top), 3));
-            Write(8, "TerrainMap.SetTerrain single floating voxel (z=top+3)",
-                top => terrainMap.SetTerrain(new Vector3Int(8, TestRow, top + 3)));
-            Write(10, "service UnsetTerrain top voxel (z=top-1, height 1), control",
-                top => terrainService.UnsetTerrain(new Vector3Int(10, TestRow, top - 1), 1));
-            shapesWritten = true;
+            Debug.LogWarning($"{Log} map too small for the test shapes");
+            return;
         }
 
-        for (var x = 2; x <= 10; x += 2)
-            Debug.Log($"{Log} column ({x},{TestRow}) now: {Column(x, TestRow)}");
+        // probe columns, logged before writing so a second use after save and reload shows what survived
+        var probes = new (string Name, int X, int Y)[]
+        {
+            ("A service platform centre", cx - 5, cy),
+            ("B direct platform centre", cx + 5, cy),
+            ("C arch opening centre", cx, cy + 6),
+            ("C arch pillar", cx - 4, cy + 6)
+        };
+        foreach (var probe in probes)
+            Debug.Log($"{Log} before: {probe.Name} ({probe.X},{probe.Y}): {Column(probe.X, probe.Y)}");
+
+        // floating platforms 3 voxels above the highest ground in their area
+        var platformZ = 0;
+        for (var x = cx - 8; x <= cx + 8; x++)
+        for (var y = cy - 3; y <= cy + 2; y++)
+            platformZ = Math.Max(platformZ, GroundTop(x, y) + 3);
+        platformZ = Math.Min(platformZ, size.z - 2);
+
+        // A: through ITerrainService, which raises the game's terrain change events
+        for (var x = cx - 8; x <= cx - 3; x++)
+        for (var y = cy - 3; y <= cy + 2; y++)
+            terrainService.SetTerrain(new Vector3Int(x, y, platformZ), 2);
+        LogBox("A service floating platform (left of centre)", cx - 8, cx - 3, cy - 3, cy + 2, platformZ, 2);
+
+        // B: directly through TerrainMap, voxel by voxel, bypassing the service
+        for (var x = cx + 3; x <= cx + 8; x++)
+        for (var y = cy - 3; y <= cy + 2; y++)
+        {
+            terrainMap.SetTerrain(new Vector3Int(x, y, platformZ));
+            terrainMap.SetTerrain(new Vector3Int(x, y, platformZ + 1));
+        }
+
+        LogBox("B direct floating platform (right of centre)", cx + 3, cx + 8, cy - 3, cy + 2, platformZ, 2);
+
+        // C: an arch through ITerrainService: a wall 4 high, then a 5 wide, 2 high opening at its bottom
+        var archY = cy + 6;
+        var groundTops = new Dictionary<int, int>();
+        for (var x = cx - 5; x <= cx + 5; x++)
+        {
+            groundTops[x] = GroundTop(x, archY);
+            terrainService.SetTerrain(new Vector3Int(x, archY, groundTops[x]), 4);
+        }
+
+        for (var x = cx - 2; x <= cx + 2; x++)
+            terrainService.UnsetTerrain(new Vector3Int(x, archY, groundTops[x]), 2);
+        Debug.Log($"{Log} C service arch (below centre) at x {cx - 5}..{cx + 5}, y {archY}, " +
+                  $"opening x {cx - 2}..{cx + 2}");
+
+        foreach (var probe in probes)
+            Debug.Log($"{Log} after: {probe.Name} ({probe.X},{probe.Y}): {Column(probe.X, probe.Y)}");
     }
 
-    private void Write(int x, string description, Action<int> write)
+    private void LogBox(string name, int x0, int x1, int y0, int y1, int z0, int height)
     {
-        var before = Column(x, TestRow);
-        try
-        {
-            write(Top(x, TestRow));
-            Debug.Log($"{Log} ({x},{TestRow}) {description}\n  before: {before}\n  after:  {Column(x, TestRow)}");
-        }
-        catch (Exception exception)
-        {
-            Debug.LogError($"{Log} ({x},{TestRow}) {description} threw: {exception}");
-        }
+        var solid = 0;
+        for (var x = x0; x <= x1; x++)
+        for (var y = y0; y <= y1; y++)
+        for (var z = z0; z < z0 + height; z++)
+            if (terrainMap.IsTerrainVoxel(new Vector3Int(x, y, z)))
+                solid++;
+        var total = (x1 - x0 + 1) * (y1 - y0 + 1) * height;
+        Debug.Log($"{Log} {name} at x {x0}..{x1}, y {y0}..{y1}, z {z0}..{z0 + height - 1}: {solid}/{total} solid");
     }
 
     // column from bottom to top, 1 = terrain
@@ -112,12 +156,13 @@ public class Phase0ChecksTool : ITool
         return builder.ToString();
     }
 
-    private int Top(int x, int y)
+    // height of the solid run starting at the bottom, ignoring anything floating above it
+    private int GroundTop(int x, int y)
     {
-        for (var z = terrainService.Size.z - 1; z >= 0; z--)
-            if (terrainMap.IsTerrainVoxel(new Vector3Int(x, y, z)))
-                return z + 1;
-        return 0;
+        var z = 0;
+        while (z < terrainService.Size.z && terrainMap.IsTerrainVoxel(new Vector3Int(x, y, z)))
+            z++;
+        return z;
     }
 
     private void CheckOtherMaps()
