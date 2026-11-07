@@ -1,3 +1,5 @@
+using Timberborn.CoreUI;
+using Timberborn.DropdownSystem;
 using Timberborn.Localization;
 using Timberborn.MapRepositorySystem;
 using Timberborn.TerrainGenerator.Generators.Wfc;
@@ -23,6 +25,7 @@ public class WfcGeneratorDialog : TerrainJobDialog
     private const string PatternSizeKey = "Ximsa.TerrainGenerator.Wfc.PatternSize";
     private const string HeightPenaltyKey = "Ximsa.TerrainGenerator.Wfc.HeightPenalty";
     private const string CoverageKey = "Ximsa.TerrainGenerator.Wfc.Coverage";
+    private const string CellSelectionKey = "Ximsa.TerrainGenerator.Wfc.CellSelection";
     private const string GenerateKey = "Ximsa.TerrainGenerator.Generate";
     private const string ReadingMapsKey = "Ximsa.TerrainGenerator.Progress.ReadingMaps";
     private const string LearningKey = "Ximsa.TerrainGenerator.Progress.Learning";
@@ -40,7 +43,8 @@ public class WfcGeneratorDialog : TerrainJobDialog
     private readonly WfcSettings settings = new() { Seed = SeedRandom.Next(100000) };
     private bool useCurrentMap = true;
 
-    public WfcGeneratorDialog(ILoc loc, MapEditorService mapEditorService, MapRepository mapRepository) :
+    public WfcGeneratorDialog(ILoc loc, MapEditorService mapEditorService, MapRepository mapRepository,
+        VisualElementInitializer visualElementInitializer, DropdownItemsSetter dropdownItemsSetter) :
         base(loc, mapEditorService)
     {
         this.mapRepository = mapRepository;
@@ -102,6 +106,10 @@ public class WfcGeneratorDialog : TerrainJobDialog
             .SetHorizontalSlider(new SliderValues<float>(0.5f, 1, (float)settings.PatternCoverage))
             .RegisterChange(coverage => settings.PatternCoverage = coverage)
             .AddEndLabel(value => $"{value * 100:F0}%"));
+        Content.AddDropdownRow(Enum.GetValues(typeof(WfcCellSelection)).Cast<WfcCellSelection>(),
+                selection => loc.T(CellSelectionKey + "." + selection), visualElementInitializer, dropdownItemsSetter,
+                loc.T(CellSelectionKey), changed => settings.CellSelection = changed.Item.Value)
+            .SetSelectedValue(settings.CellSelection);
         generateButton = Content.AddButton(loc.T(GenerateKey), GenerateKey, OnGenerate);
         AddProgressBar();
         AddCloseButton();

@@ -81,3 +81,10 @@ Ximsa.TerrainGenerator.TreePlacement.BushSpecies,"Bush species",-
 Ximsa.TerrainGenerator.Progress.ChoosingPlants,"Choosing places for plants",-
 Ximsa.TerrainGenerator.Noise3D.Ruggedness,"Ruggedness (rounded .. rugged peaks)",-
 Ximsa.TerrainGenerator.Noise3D.Hilliness,"Hilliness (flat .. hilly)",-
+Ximsa.TerrainGenerator.Wfc.CellSelection,"Next cell to collapse",-
+Ximsa.TerrainGenerator.Wfc.CellSelection.LowestEntropy,"Lowest entropy",-
+Ximsa.TerrainGenerator.Wfc.CellSelection.FewestPatterns,"Fewest patterns",-
+Ximsa.TerrainGenerator.Wfc.CellSelection.LayerByLayer,"Layer by layer (ground first)",-
+Ximsa.TerrainGenerator.Wfc.CellSelection.Scanline,"Scanline (fixed order)",-
+Ximsa.TerrainGenerator.Wfc.CellSelection.CentreOutward,"Centre outward",-
+Ximsa.TerrainGenerator.Wfc.CellSelection.RandomOrder,"Random order",-

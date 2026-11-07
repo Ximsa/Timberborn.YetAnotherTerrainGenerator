@@ -9,7 +9,8 @@ using TerrainPreview;
 //   TerrainPreview noise3d --size 128x128x23 --seed 1 [--hilliness 1] [--ruggedness 0.5] [--base 56] [--vscale 3]
 //       [--hscale 3] [--rivers 1] [--river-seed 1] --out preview.png   (--rivers works after any map-producing command)
 //   TerrainPreview wfc --sources a.timber,b.timber --size 64x64x23 --seed 1 [--n 3] [--symmetry true]
-//       [--periodic false] [--penalty 0.5] [--threshold 0.25] [--coverage 0.95] [--block 4] [--seeds 1-10] --out preview.png
+//       [--periodic false] [--penalty 0.5] [--threshold 0.25] [--coverage 0.95] [--block 4] [--seeds 1-10]
+//       [--select lowestentropy|fewestpatterns|layerbylayer|scanline|centreoutward|randomorder] --out preview.png
 //   TerrainPreview threshold-sweep --sources a.timber,b.timber [--size 128x128x23] [--seed 1] [--start 0] --out-dir <dir>
 //   TerrainPreview map <file.timber> --out preview.png
 //   TerrainPreview sharpen <file.timber> [--region 4] [--min-area 48] [--step 2] [--strength 1] --out preview.png
@@ -62,7 +63,8 @@ switch (args[0])
             HeightPenalty = double.Parse(options.GetValueOrDefault("penalty", "0.5"), System.Globalization.CultureInfo.InvariantCulture),
             SolidThreshold = double.Parse(options.GetValueOrDefault("threshold", "0.25"), System.Globalization.CultureInfo.InvariantCulture),
             PatternCoverage = double.Parse(options.GetValueOrDefault("coverage", "0.95"), System.Globalization.CultureInfo.InvariantCulture),
-            BlockSize = int.Parse(options.GetValueOrDefault("block", "4"))
+            BlockSize = int.Parse(options.GetValueOrDefault("block", "4")),
+            CellSelection = Enum.Parse<WfcCellSelection>(options.GetValueOrDefault("select", "LowestEntropy"), true)
         };
         var sources = options["sources"].Split(',').Select(path =>
         {

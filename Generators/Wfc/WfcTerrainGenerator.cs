@@ -1,5 +1,27 @@
 namespace Timberborn.TerrainGenerator.Generators.Wfc;
 
+// how the solver picks the next cell to collapse; ties are broken randomly
+public enum WfcCellSelection
+{
+    // the cell whose remaining patterns are least uncertain, weighted by their probabilities (classic WFC)
+    LowestEntropy,
+
+    // the cell with the fewest remaining patterns, ignoring their weights
+    FewestPatterns,
+
+    // lowest entropy, but each height layer is finished before the next, from the ground up
+    LayerByLayer,
+
+    // a fixed order: the bottom layer first, row by row
+    Scanline,
+
+    // the undecided cell nearest the map centre (lowest entropy among equals), so terrain grows outwards
+    CentreOutward,
+
+    // a random undecided cell
+    RandomOrder
+}
+
 public sealed class WfcSettings
 {
     // edge length of the patterns in coarse blocks (2 or 3); larger patterns copy bigger structures but are slower
@@ -31,6 +53,8 @@ public sealed class WfcSettings
 
     // attempts with different random choices before giving up after contradictions
     public int Attempts = 5;
+
+    public WfcCellSelection CellSelection = WfcCellSelection.LowestEntropy;
 
     public int Seed;
 
@@ -91,7 +115,7 @@ public sealed class WfcTerrainGenerator
         {
             AttemptsUsed = attempt + 1;
             var solver = new WfcSolver(patterns, coarseX - n + 1, coarseY - n + 1, coarseZ - n + 1,
-                new Random(settings.Seed + attempt * 7919), settings.MaxBacktracks);
+                new Random(settings.Seed + attempt * 7919), settings.MaxBacktracks, settings.CellSelection);
             var solved = solver.Run(progress);
             Backtracks += solver.Backtracks;
             if (solved)

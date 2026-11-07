@@ -1,7 +1,8 @@
 namespace Timberborn.TerrainGenerator.Generators.Wfc;
 
 // Wave function collapse over a 3D grid of cells. Each cell keeps the set of patterns it may still take as a bitset;
-// the lowest-entropy cell is collapsed to one weighted-random pattern and the choice is propagated to neighbours,
+// the next cell (by default the lowest-entropy one, see WfcCellSelection) is collapsed to one weighted-random pattern
+// and the choice is propagated to neighbours,
 // until every cell is decided. On a contradiction (a cell with no pattern left) the solver backtracks: it undoes the
 // last choice, bans that pattern in that cell and propagates again, stepping further back if that fails too.
 internal sealed class WfcSolver
@@ -10,9 +11,11 @@ internal sealed class WfcSolver
     private readonly int cells;
     private readonly int[] decidedPattern;
     private readonly Stack<Decision> decisions = new();
-    private readonly double[] entropyNoise;
+    // per cell: a random value in [0, 1) that breaks ties, or orders the cells for RandomOrder
+    private readonly double[] order;
     private readonly MinHeap heap = new();
     private readonly int maxBacktracks;
+    private readonly WfcCellSelection selection;
     private readonly WfcPatternSet patterns;
     private readonly bool[] queued;
     private readonly Random random;
@@ -35,11 +38,13 @@ internal sealed class WfcSolver
     private readonly int words;
     private int decided;
 
-    public WfcSolver(WfcPatternSet patterns, int sizeX, int sizeY, int sizeZ, Random random, int maxBacktracks)
+    public WfcSolver(WfcPatternSet patterns, int sizeX, int sizeY, int sizeZ, Random random, int maxBacktracks,
+        WfcCellSelection selection = WfcCellSelection.LowestEntropy)
     {
         this.patterns = patterns;
         this.random = random;
         this.maxBacktracks = maxBacktracks;
+        this.selection = selection;
         SizeX = sizeX;
         SizeY = sizeY;
         SizeZ = sizeZ;
@@ -52,7 +57,7 @@ internal sealed class WfcSolver
         remaining = new int[cells];
         version = new int[cells];
         decidedPattern = new int[cells];
-        entropyNoise = new double[cells];
+        order = new double[cells];
         weightLogsByLayer = patterns.LayerWeights
             .Select(weights => weights.Select(weight => weight * Math.Log(weight)).ToArray()).ToArray();
     }
@@ -107,7 +112,7 @@ internal sealed class WfcSolver
         {
             Array.Copy(full, 0, wave, cell * words, words);
             remaining[cell] = patterns.Count;
-            entropyNoise[cell] = random.NextDouble() * 1e-6;
+            order[cell] = random.NextDouble();
             if (patterns.Count > 1)
                 Push(cell);
             else
@@ -115,7 +120,7 @@ internal sealed class WfcSolver
         }
     }
 
-    // the undecided cell with the lowest entropy, or -1 when all cells are decided
+    // the undecided cell with the lowest priority, or -1 when all cells are decided
     private int NextCell()
     {
         while (heap.Count > 0)
@@ -306,7 +311,7 @@ internal sealed class WfcSolver
         return ApplyChange(neighbour, count);
     }
 
-    // after a cell lost patterns: records how many remain, requeues it with its new entropy and schedules it for
+    // after a cell lost patterns: records how many remain, requeues it with its new priority and schedules it for
     // propagation; false on contradiction
     private bool ApplyChange(int cell, int count)
     {
@@ -338,7 +343,33 @@ internal sealed class WfcSolver
     private void Push(int cell)
     {
         version[cell]++;
-        heap.Push(Entropy(cell) + entropyNoise[cell], cell, version[cell]);
+        heap.Push(Priority(cell), cell, version[cell]);
+    }
+
+    // lower is collapsed first; the random order value breaks ties
+    private double Priority(int cell)
+    {
+        const double tie = 1e-6;
+        var layer = cell / (SizeX * SizeY);
+        switch (selection)
+        {
+            case WfcCellSelection.FewestPatterns:
+                return remaining[cell] + order[cell] * 0.5;
+            case WfcCellSelection.LayerByLayer:
+                // entropy stays far below 1000 (it is at most the log of the pattern count)
+                return layer * 1000 + Entropy(cell) + order[cell] * tie;
+            case WfcCellSelection.Scanline:
+                return cell;
+            case WfcCellSelection.CentreOutward:
+            {
+                double dx = cell % SizeX - (SizeX - 1) / 2.0, dy = cell / SizeX % SizeY - (SizeY - 1) / 2.0;
+                return Math.Round(Math.Sqrt(dx * dx + dy * dy)) * 1000 + Entropy(cell) + order[cell] * tie;
+            }
+            case WfcCellSelection.RandomOrder:
+                return order[cell];
+            default:
+                return Entropy(cell) + order[cell] * tie;
+        }
     }
 
     // Shannon entropy of the cell's remaining patterns, weighted by their probability at the cell's height
