@@ -17,9 +17,9 @@ A second bottom-bar button group, **Terrain Tools**, built with the same group c
 | 0 Spikes | API found in game code (see findings); not yet confirmed in game |
 | 1 Group, smoothing, surface editing | Built; not yet tested in game |
 | 2 Cliff Sharpening | Built and previewed offline; not yet tested in game |
-| 3 River Carver | Algorithm built and previewed offline; game dialog and water source spawning still to do |
-| 4 Tree Placement | Algorithm built and previewed offline (`TerrainPreview trees`); game dialog and spawning still to do |
-| 5 Polish and release | Not started |
+| 3 River Carver | Built (dialog, water sources) and previewed offline; not yet tested in game |
+| 4 Tree Placement | Built (dialog, spawning) and previewed offline; not yet tested in game |
+| 5 Polish and release | Placeholder icons for all tools, texts done, release folder updated; version bump still to do |
 
 ## Decisions
 
@@ -149,3 +149,16 @@ The terrain tools work on a heightmap, but must not destroy 3D terrain:
 - **Watershed over-segmentation** on noisy maps: the smoothing radius and minimum region area control it.
 - **Water sources on carved beds** may flood more than the river when the course is shallow; depth and strength
   settings, plus testing on several generated maps.
+
+## In-game test checklist
+
+Built against the game's assemblies but not run in game yet (2026-11-07). In the map editor:
+
+1. The Terrain Tools group shows four tools; each opens its dialog and the hover text names it.
+2. Terrain Smoothing and Cliff Sharpening keep overhangs, and only remove entities in changed columns.
+3. River Carver: rivers are at most one block deep; a water source appears at each head with the chosen strength;
+   water flows when the simulation runs; the water sources survive saving and reloading. `EntityPlacer` picks the
+   smallest clean, unregulated water source template; check it is the expected one.
+4. Tree Placement: the species sliders list the faction's trees and bushes by name; old trees and bushes are
+   removed; new ones are grown, survive saving and reloading, and stay off water (water is read from the game's
+   water map, so it must already exist, e.g. after running the simulation once).

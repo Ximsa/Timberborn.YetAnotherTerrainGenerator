@@ -38,11 +38,17 @@ public class MapEditorService
 
     public void RemoveAllEntityComponents()
     {
+        RemoveEntities(_ => true);
+    }
+
+    // removes every entity on the map that matches the filter
+    public void RemoveEntities(Func<BlockObject, bool> filter)
+    {
         var worldBlocks = blockService.GetFieldValue<Array3D<WorldBlock>>("_blocks");
         var worldBlocksArray = worldBlocks!.GetFieldValue<WorldBlock[,,]>("_values");
         foreach (var worldBlock in worldBlocksArray!)
         {
-            var blockObjects = worldBlock.BlockObjects.Where(x => x.HasComponent<EntityComponent>())
+            var blockObjects = worldBlock.BlockObjects.Where(x => x.HasComponent<EntityComponent>() && filter(x))
                 .ToArray();
             foreach (var block in blockObjects) entityService.Delete(block);
         }

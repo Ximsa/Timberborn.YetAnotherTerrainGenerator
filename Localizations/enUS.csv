@@ -64,3 +64,20 @@ Ximsa.TerrainGenerator.CliffSharpening.StepSize,"Height step between plateaus",-
 Ximsa.TerrainGenerator.CliffSharpening.Strength,"Strength",-
 Ximsa.TerrainGenerator.Progress.Sharpening,"Sharpening cliffs",-
 Ximsa.TerrainGenerator.Variety,"Variety (in spreads of the built-in maps)",-
+Ximsa.TerrainGenerator.Progress.Placing,"Placing",-
+Ximsa.TerrainGenerator.Tool.RiverCarver,"River Carver",-
+Ximsa.TerrainGenerator.Tool.RiverCarver.Description,"Carves rivers that start half way up a hill and run downhill to the map edge or a lake, with a water source at each head. Lowers the terrain by at most one block.",-
+Ximsa.TerrainGenerator.RiverCarver.Rivers,"Number of rivers",-
+Ximsa.TerrainGenerator.RiverCarver.Width,"River width (tiles)",-
+Ximsa.TerrainGenerator.RiverCarver.LakeSize,"Lake size (a basin this big ends a river)",-
+Ximsa.TerrainGenerator.RiverCarver.SourceStrength,"Water source strength",-
+Ximsa.TerrainGenerator.Progress.Carving,"Carving rivers",-
+Ximsa.TerrainGenerator.Tool.TreePlacement,"Tree Placement",-
+Ximsa.TerrainGenerator.Tool.TreePlacement.Description,"Replaces all trees and bushes with forests and bush patches, denser near water and kept off cliff edges.",-
+Ximsa.TerrainGenerator.TreePlacement.ForestCoverage,"Forest coverage",-
+Ximsa.TerrainGenerator.TreePlacement.BushCoverage,"Bush coverage",-
+Ximsa.TerrainGenerator.TreePlacement.PatchSize,"Patch size (tiles)",-
+Ximsa.TerrainGenerator.TreePlacement.Density,"Density inside patches",-
+Ximsa.TerrainGenerator.TreePlacement.TreeSpecies,"Tree species",-
+Ximsa.TerrainGenerator.TreePlacement.BushSpecies,"Bush species",-
+Ximsa.TerrainGenerator.Progress.ChoosingPlants,"Choosing places for plants",-

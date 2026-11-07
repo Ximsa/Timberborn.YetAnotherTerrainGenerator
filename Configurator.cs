@@ -35,6 +35,9 @@ public class MapEditorConfigurator : Configurator
 
         Bind<TerrainSmoothingTool>().AsSingleton();
         Bind<CliffSharpeningTool>().AsSingleton();
+        Bind<EntityPlacer>().AsSingleton();
+        Bind<RiverCarverTool>().AsSingleton();
+        Bind<TreePlacementTool>().AsSingleton();
         Bind<TerrainToolsGroupButton>().AsSingleton();
         MultiBind<BottomBarModule>().ToProvider<BottomBarModuleProvider<TerrainToolsGroupButton>>().AsSingleton();
     }
