@@ -77,27 +77,45 @@ public class MapEditorService
         mapEditorSceneLoader.LoadMap(MapFileReference.FromUserFolder("generated"));
     }
 
-    // applies one map row per step and yields the fraction of rows done, so callers can spread it over frames
-    public IEnumerable<float> Set2DTerrainByRow(NDArray heightmap)
+    // makes the map's terrain match target, one map row per step, yielding the fraction of rows done so callers
+    // can spread it over frames; only voxels that differ are written, through ITerrainService so the game redraws
+    public IEnumerable<float> SetVoxelsByRow(VoxelMap target)
     {
-        heightmap = heightmap.astype(np.int32);
-        for (var i = 0; i < MapSize.y; i++)
+        var size = terrainService.Size;
+        if (target.SizeX != size.x || target.SizeY != size.y || target.SizeZ > size.z)
+            throw new ArgumentException(
+                $"Terrain of {target.SizeX}x{target.SizeY}x{target.SizeZ} does not fit the map ({size})");
+        for (var y = 0; y < size.y; y++)
         {
-            Set2DTerrainRow(heightmap, i);
-            yield return (i + 1f) / MapSize.y;
+            for (var x = 0; x < size.x; x++)
+                SetColumn(target, x, y, size.z);
+            yield return (y + 1f) / size.y;
         }
     }
 
-    private void Set2DTerrainRow(NDArray heightmap, int i)
+    private void SetColumn(VoxelMap target, int x, int y, int sizeZ)
     {
-        for (var j = 0; j < MapSize.x; j++)
+        var z = 0;
+        while (z < sizeZ)
         {
-            var height = terrainService.GetAllHeightsInCell(new Vector2Int(j, i)).Select(x => x.z).DefaultIfEmpty(0).Max();
-            var targetHeight = (int)heightmap[i, j];
-            if (height > targetHeight)
-                terrainService.UnsetTerrain(new Vector3Int(j, i, height), height - targetHeight + 1);
+            var wanted = z < target.SizeZ && target[x, y, z];
+            if (terrainMap.IsTerrainVoxel(new Vector3Int(x, y, z)) == wanted)
+            {
+                z++;
+                continue;
+            }
+
+            // a run of voxels that all need the same change
+            var start = z;
+            while (z < sizeZ && (z < target.SizeZ && target[x, y, z]) == wanted &&
+                   terrainMap.IsTerrainVoxel(new Vector3Int(x, y, z)) != wanted)
+                z++;
+            if (wanted)
+                // SetTerrain fills upwards from the given voxel
+                terrainService.SetTerrain(new Vector3Int(x, y, start), z - start);
             else
-                terrainService.SetTerrain(new Vector3Int(j, i, height), targetHeight - height);
+                // UnsetTerrain removes downwards from the given voxel
+                terrainService.UnsetTerrain(new Vector3Int(x, y, z - 1), z - start);
         }
     }
 }

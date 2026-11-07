@@ -30,3 +30,5 @@ Ximsa.TerrainGenerator.Tool.Autoencoder,"Autoencoder Generator",-
 Ximsa.TerrainGenerator.Tool.Autoencoder.Description,"Generates new terrain from the current map with a neural autoencoder.",-
 Ximsa.TerrainGenerator.Tool.Smoothing,"Global Terrain Filter",-
 Ximsa.TerrainGenerator.Tool.Smoothing.Description,"Smooths the whole map with a median filter.",-
+Ximsa.TerrainGenerator.Progress.Starting,"Starting",-
+Ximsa.TerrainGenerator.Progress.Cancelled,"Cancelled, terrain unchanged",-

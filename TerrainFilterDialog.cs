@@ -41,7 +41,7 @@ public class TerrainFilterDialog : TerrainJobDialog
     {
         var passes = this.passes;
         var radius = this.radius;
-        RunJob(applyButton, (terrain, _, progress) =>
+        RunJob(applyButton, (terrain, mapSize, progress) =>
         {
             terrain = terrain.astype(np.float32).sum(0);
             var originalMax = terrain.max();
@@ -49,7 +49,7 @@ public class TerrainFilterDialog : TerrainJobDialog
             terrain = progress.Stage(FilteringKey, 0, 1, report => terrain.MedianBlur(radius, passes, report));
             terrain -= terrain.min() + originalMin;
             terrain = terrain / terrain.max() * originalMax;
-            return terrain;
+            return VoxelMap.FromHeightmap(terrain, mapSize.z);
         });
     }
 }

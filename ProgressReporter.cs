@@ -5,11 +5,18 @@ namespace Timberborn.TerrainGenerator;
 
 // Thread-safe progress shared between a background job and the UI thread.
 // Stages are identified by localization keys, which the UI translates when displaying them.
+// Reporting progress also checks for cancellation, so a cancelled job stops at its next report.
 public class ProgressReporter
 {
+    private readonly CancellationToken cancellationToken;
     private readonly object sync = new();
     private float fraction;
     private string stageKey = string.Empty;
+
+    public ProgressReporter(CancellationToken cancellationToken = default)
+    {
+        this.cancellationToken = cancellationToken;
+    }
 
     public (string StageKey, float Fraction) Current
     {
@@ -24,6 +31,7 @@ public class ProgressReporter
 
     public void Report(string stageKey, float fraction)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         lock (sync)
         {
             this.stageKey = stageKey;

@@ -77,7 +77,8 @@ public class TerrainGeneratorDialog : TerrainJobDialog
     {
         // snapshot, so moving sliders while the job runs does not affect it
         var jobSettings = settings.Clone();
-        RunJob(generateButton, (terrain, mapSize, progress) => Pipeline2D(terrain, mapSize, jobSettings, progress));
+        RunJob(generateButton, (terrain, mapSize, progress) =>
+            VoxelMap.FromHeightmap(Pipeline2D(terrain, mapSize, jobSettings, progress), mapSize.z));
     }
 
     // encode current map, add noise, decode map; runs on a background thread
