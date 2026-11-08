@@ -1,7 +1,9 @@
+using Bindito.Core;
 using Timberborn.CoreUI;
 using Timberborn.Localization;
 using Timberborn.ToolSystem;
 using Timberborn.ToolSystemUI;
+using Timberborn.TooltipSystem;
 using TimberUi.CommonUi;
 
 namespace Timberborn.TerrainGenerator.Game.Common;
@@ -13,6 +15,7 @@ public abstract class DialogTool : ITool, IToolDescriptor
     private readonly PanelStack panelStack;
     private readonly ToolService toolService;
     private readonly VisualElementInitializer visualElementInitializer;
+    private ITooltipRegistrar? tooltipRegistrar;
     protected readonly ILoc loc;
 
     protected DialogTool(VisualElementInitializer visualElementInitializer, PanelStack panelStack,
@@ -24,12 +27,22 @@ public abstract class DialogTool : ITool, IToolDescriptor
         this.loc = loc;
     }
 
+    // method injection, so the tools' constructors stay unchanged
+    [Inject]
+    public void InjectDependencies(ITooltipRegistrar registrar)
+    {
+        tooltipRegistrar = registrar;
+    }
+
     public abstract string NameLocKey { get; }
     protected abstract string DescriptionLocKey { get; }
 
     public void Enter()
     {
-        CreateDialog().Show(visualElementInitializer, panelStack);
+        var dialog = CreateDialog();
+        if (dialog is TerrainJobDialog jobDialog && tooltipRegistrar != null)
+            jobDialog.RegisterTooltips(tooltipRegistrar);
+        dialog.Show(visualElementInitializer, panelStack);
         // the tool only opens a dialog, so hand control straight back to the default tool
         toolService.SwitchToDefaultTool();
     }

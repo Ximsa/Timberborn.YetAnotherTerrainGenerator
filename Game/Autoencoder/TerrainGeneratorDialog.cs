@@ -32,11 +32,11 @@ public class TerrainGeneratorDialog : TerrainJobDialog
             .SetHorizontalSlider(new SliderValues<float>(0, 1, settings.KeepCurrent))
             .RegisterChange(keepCurrent => settings.KeepCurrent = keepCurrent)
             .AddEndLabel(value => $"{value * 100:F0}%"));
-        Content.Add(new GameSlider()
+        Content.Add(WithTooltip(VarietyKey, new GameSlider()
             .SetLabel($"{loc.T(VarietyKey)}")
             .SetHorizontalSlider(new SliderValues<float>(0, 3, settings.Variety))
             .RegisterChange(variety => settings.Variety = variety)
-            .AddEndLabel(value => $"{value:F2}"));
+            .AddEndLabel(value => $"{value:F2}")));
         Content.Add(new GameSlider()
             .SetLabel($"{loc.T(ZoomFactorKey)}")
             .SetHorizontalSlider(new SliderValues<float>(1, 8, settings.ZoomFactor))
@@ -46,11 +46,11 @@ public class TerrainGeneratorDialog : TerrainJobDialog
             .SetValueWithoutNotify(settings.Normalize);
         // the height normalizing stretches to
         maxTerrainHeight = mapEditorService.MapSize.z;
-        Content.Add(new GameSliderInt()
+        Content.Add(WithTooltip(MaxHeightKey, new GameSliderInt()
             .SetLabel($"{loc.T(MaxHeightKey)}")
             .SetHorizontalSlider(new SliderValues<int>(1, mapEditorService.MapSize.z, mapEditorService.MapSize.z))
             .RegisterChange(maxHeight => maxTerrainHeight = maxHeight)
-            .AddEndLabel(value => $"{value}"));
+            .AddEndLabel(value => $"{value}")));
         generateButton = Content.AddButton(loc.T(GenerateKey), GenerateKey, OnGenerate);
         AddProgressBar();
         AddCloseButton();

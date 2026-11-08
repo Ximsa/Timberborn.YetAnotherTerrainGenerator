@@ -5,7 +5,7 @@ namespace Timberborn.TerrainGenerator.Core.Trees;
 public sealed class TreePlacerSettings
 {
     // share of the plantable land inside forest patches
-    public double ForestCoverage = 0.35;
+    public double ForestCoverage = 0.2;
 
     // share of the plantable land inside bush patches (outside forests)
     public double BushCoverage = 0.12;
@@ -17,10 +17,10 @@ public sealed class TreePlacerSettings
     public int ClumpSize = 6;
 
     // chance of a plant on a tile inside a patch, far from water
-    public double Density = 0.5;
+    public double Density = 0.35;
 
     // added to the density right next to water, fading out over WaterReach tiles
-    public double WaterBonus = 0.4;
+    public double WaterBonus = 0.3;
     public int WaterReach = 10;
 
     // relative share of each tree and bush species; zero leaves a species out

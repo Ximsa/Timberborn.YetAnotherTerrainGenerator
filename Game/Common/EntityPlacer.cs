@@ -1,13 +1,10 @@
-using Timberborn.BlockSystem;
 using Timberborn.Coordinates;
 using Timberborn.EntitySystem;
 using Timberborn.Forestry;
 using Timberborn.MapEditorNaturalResources;
 using Timberborn.NaturalResources;
 using Timberborn.TemplateSystem;
-using Timberborn.TerrainGenerator.Core.Rivers;
 using Timberborn.TerrainGenerator.Core.Trees;
-using Timberborn.WaterSourceSystem;
 using Timberborn.WaterSystem;
 using UnityEngine;
 
@@ -16,26 +13,21 @@ namespace Timberborn.TerrainGenerator.Game.Common;
 // a tree or bush species: its template id and the localization key of its name
 public readonly record struct Species(string Id, string NameLocKey);
 
-// Spawns the terrain tools' trees, bushes and water sources through the same game services as the map editor's
+// Spawns the terrain tools' trees and bushes through the same game services as the map editor's
 // own brushes, and reads where water is.
 public class EntityPlacer
 {
     // share of mature bushes that start with their yield ready, like the editor brush's default
     private const float GatherablePercent = 0.5f;
 
-    private readonly BlockObjectFactory blockObjectFactory;
-    private readonly BlockValidator blockValidator;
     private readonly MapEditorService mapEditorService;
     private readonly NaturalResourceSpawner naturalResourceSpawner;
     private readonly TemplateService templateService;
     private readonly IThreadSafeWaterMap waterMap;
 
-    public EntityPlacer(BlockObjectFactory blockObjectFactory, BlockValidator blockValidator,
-        MapEditorService mapEditorService,
-        NaturalResourceSpawner naturalResourceSpawner, TemplateService templateService, IThreadSafeWaterMap waterMap)
+    public EntityPlacer(MapEditorService mapEditorService, NaturalResourceSpawner naturalResourceSpawner,
+        TemplateService templateService, IThreadSafeWaterMap waterMap)
     {
-        this.blockObjectFactory = blockObjectFactory;
-        this.blockValidator = blockValidator;
         this.mapEditorService = mapEditorService;
         this.naturalResourceSpawner = naturalResourceSpawner;
         this.templateService = templateService;
@@ -79,36 +71,6 @@ public class EntityPlacer
         }
 
         yield return 1;
-    }
-
-    // places the smallest clean water source with its corner on the first spot where the game accepts it (no terrain
-    // or objects in its way, ground below); spots stand on the surface. Returns the spot used, or null if none fits
-    public RiverHead? PlaceWaterSource(IEnumerable<RiverHead> spots, float strength)
-    {
-        var template = WaterSourceTemplate();
-        foreach (var spot in spots)
-        {
-            var placement = new Placement(new Vector3Int(spot.X, spot.Y, spot.Z));
-            if (!blockValidator.BlocksValid(template, placement)) continue;
-            var blockObject = blockObjectFactory.CreateFinished(new EntitySetup.Builder(template.Blueprint), placement);
-            blockObject.GetComponent<WaterSource>().SetSpecifiedStrength(strength);
-            return spot;
-        }
-
-        return null;
-    }
-
-    private BlockObjectSpec WaterSourceTemplate()
-    {
-        var source = templateService.GetAll<WaterSourceSpec>()
-            .Where(spec => !spec.HasSpec<WaterSourceRegulatorSpec>() && !spec.HasSpec<UndergroundWaterSourceSpec>())
-            .Where(spec => !spec.HasSpec<WaterSourceContaminationSpec>() ||
-                           spec.GetSpec<WaterSourceContaminationSpec>().DefaultContamination <= 0)
-            .OrderBy(spec => spec.Coordinates.Length)
-            .FirstOrDefault();
-        if (source == null)
-            throw new InvalidOperationException("The game has no clean water source template");
-        return source.GetSpec<BlockObjectSpec>();
     }
 
     private IReadOnlyList<Species> SpeciesWith(Func<NaturalResourceSpec, bool> filter)

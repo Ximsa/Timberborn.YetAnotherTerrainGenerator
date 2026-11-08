@@ -3,7 +3,7 @@
 ## Goal
 
 Make good Timberborn maps quickly in the map editor: generate varied terrain, then turn it into terrain that plays
-like a Timberborn map, with flat ground to build on, cliffs between levels, rivers with water and forests, in a few
+like a Timberborn map, with flat ground to build on, cliffs between levels and forests, in a few
 clicks instead of hours of brushing.
 
 ## Workflow
@@ -19,7 +19,6 @@ clicks instead of hours of brushing.
 | Generate | WFC Generator | Terrain assembled from 3D patterns learned from chosen maps (the current one, built-in ones, the user's own) |
 | Shape | Terrain Smoothing | Calms rough terrain |
 | Shape | Cliff Sharpening | Splits terrain into flat plateaus with cliffs between them, so buildings fit |
-| Shape | River Carver | Rivers from a few tiles below hilltops down to the map edge, filling basins on the way up to a set volume and tunnelling out of full ones, with a water source at each head |
 | Shape | Tree Placement | Forests and bush patches, denser near water, off cliff edges |
 
 ## Principles
@@ -34,7 +33,7 @@ clicks instead of hours of brushing.
   game from deleting floating terrain on load, and the terrain tools only change the top surface of each column so
   what lies below survives.
 - **Gentle tools.** Tools change what they need and leave the rest: terrain tools only remove entities in columns
-  whose terrain changed, rivers lower the ground by at most one block, Tree Placement only replaces trees and bushes.
+  whose terrain changed, Tree Placement only replaces trees and bushes.
 - **Simple controls.** Every tool is one dialog with a few sliders whose names say what they do (Hilliness,
   Ruggedness, Variety, Width), with defaults that give a good result on their own.
 - **Responsive editor.** Long computations run in the background with progress and Cancel; changes to the map are
@@ -44,7 +43,7 @@ clicks instead of hours of brushing.
 
 ## Scope
 
-- **In:** map editor tools for terrain, water sources at river heads, trees and bushes.
+- **In:** map editor tools for terrain, trees and bushes. (A River Carver was tried and removed on 2026-11-08.)
 - **Out:** the game itself (no in-game tools), caves and underground features, resources other than trees and
   bushes, buildings, hand-placed details.
 

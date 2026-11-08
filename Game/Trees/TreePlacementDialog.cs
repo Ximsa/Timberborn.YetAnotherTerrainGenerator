@@ -36,11 +36,11 @@ public class TreePlacementDialog : TerrainJobDialog
         SetTitle(loc.T(TitleKey));
         AddPercentSlider(ForestCoverageKey, settings.ForestCoverage, value => settings.ForestCoverage = value);
         AddPercentSlider(BushCoverageKey, settings.BushCoverage, value => settings.BushCoverage = value);
-        Content.Add(new GameSliderInt()
+        Content.Add(WithTooltip(PatchSizeKey, new GameSliderInt()
             .SetLabel(loc.T(PatchSizeKey))
             .SetHorizontalSlider(new SliderValues<int>(8, 96, settings.PatchSize))
             .RegisterChange(patchSize => settings.PatchSize = patchSize)
-            .AddEndLabel(value => $"{value}"));
+            .AddEndLabel(value => $"{value}")));
         AddPercentSlider(DensityKey, settings.Density, value => settings.Density = value);
         AddWeightSliders(TreeSpeciesKey, trees, settings.TreeWeights);
         AddWeightSliders(BushSpeciesKey, bushes, settings.BushWeights);

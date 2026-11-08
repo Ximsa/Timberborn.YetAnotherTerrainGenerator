@@ -18,7 +18,7 @@ bottom-bar button group that expands into three buttons.
 | 1 Button group | Done, tested in game (Autoencoder Generator) |
 | 2 3D apply path, Cancel | Built; not yet tested in game |
 | 3 3D Noise Generator | Built and previewed offline; not yet tested in game |
-| 4 WFC Generator | Built and previewed offline; not yet tested in game |
+| 4 WFC Generator | Rewritten as face-lookup WFC (2026-11-08, see [wfc-face-lookup.md](wfc-face-lookup.md)); previewed offline, not yet tested in game |
 | 5 Polish and release | 1.2.0 in `release/version-1.1`, placeholder icons; in-game testing still to do |
 
 Offline previews: `tools/TerrainPreview` renders the generators and any `.timber` map as PNG.
@@ -123,6 +123,10 @@ The noise is sampled at the scaled coordinates, rather than generating a full be
 - Progress stages: biome noise, density noise, interpolation, applying.
 
 ### Phase 4: WFC Generator
+
+**Superseded (2026-11-08):** the coarse-block overlapping WFC below was replaced by face-lookup WFC on single voxels,
+see [wfc-face-lookup.md](wfc-face-lookup.md). The source checklist and map loading are unchanged; the notes below
+describe the old algorithm.
 
 Adjusted after the first previews (single-voxel 2x2x2 patterns degenerate into pillars; 3x3x3 patterns at full
 resolution give thousands of patterns and are far too slow):

@@ -1,6 +1,5 @@
 using Timberborn.AssetSystem;
 using Timberborn.TerrainGenerator.Game.CliffSharpening;
-using Timberborn.TerrainGenerator.Game.Rivers;
 using Timberborn.TerrainGenerator.Game.Smoothing;
 using Timberborn.TerrainGenerator.Game.Trees;
 using Timberborn.ToolButtonSystem;
@@ -11,19 +10,17 @@ namespace Timberborn.TerrainGenerator.Game.Common;
 public class TerrainToolsGroupButton : ToolGroupBottomBarButton
 {
     private readonly CliffSharpeningTool cliffSharpeningTool;
-    private readonly RiverCarverTool riverCarverTool;
     private readonly TerrainSmoothingTool terrainSmoothingTool;
     private readonly TreePlacementTool treePlacementTool;
 
     public TerrainToolsGroupButton(ToolGroupService toolGroupService,
         ToolGroupButtonFactory toolGroupButtonFactory, ToolButtonFactory toolButtonFactory,
         IAssetLoader assetLoader, TerrainSmoothingTool terrainSmoothingTool, CliffSharpeningTool cliffSharpeningTool,
-        RiverCarverTool riverCarverTool, TreePlacementTool treePlacementTool) :
+        TreePlacementTool treePlacementTool) :
         base(toolGroupService, toolGroupButtonFactory, toolButtonFactory, assetLoader)
     {
         this.terrainSmoothingTool = terrainSmoothingTool;
         this.cliffSharpeningTool = cliffSharpeningTool;
-        this.riverCarverTool = riverCarverTool;
         this.treePlacementTool = treePlacementTool;
     }
 
@@ -33,7 +30,6 @@ public class TerrainToolsGroupButton : ToolGroupBottomBarButton
     {
         (terrainSmoothingTool, "Sprites/terrain-smoothing-button"),
         (cliffSharpeningTool, "Sprites/terrain-sharpen-button"),
-        (riverCarverTool, "Sprites/river-carver-button"),
         (treePlacementTool, "Sprites/tree-placement-button")
     };
 }

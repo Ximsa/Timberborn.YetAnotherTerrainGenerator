@@ -2,61 +2,27 @@ using Timberborn.TerrainGenerator.Core.Common;
 
 namespace Timberborn.TerrainGenerator.Core.Wfc;
 
-// how the solver picks the next cell to collapse; ties are broken randomly
-public enum WfcCellSelection
-{
-    // the cell whose remaining patterns are least uncertain, weighted by their probabilities (classic WFC)
-    LowestEntropy,
-
-    // the cell with the fewest remaining patterns, ignoring their weights
-    FewestPatterns,
-
-    // lowest entropy, but each height layer is finished before the next, from the ground up
-    LayerByLayer,
-
-    // a fixed order: the bottom layer first, row by row
-    Scanline,
-
-    // the undecided cell nearest the map centre (lowest entropy among equals), so terrain grows outwards
-    CentreOutward,
-
-    // a random undecided cell
-    RandomOrder
-}
-
 public sealed class WfcSettings
 {
-    // edge length of the patterns in coarse blocks (2 or 3); larger patterns copy bigger structures but are slower
-    public int PatternSize = 3;
+    // pattern size in voxels: width across (x and y), height up
+    public int PatternWidth = 6;
+    public int PatternHeight = 4;
 
-    // add rotations around the vertical axis and mirror images of the source patterns
-    public bool Symmetry = true;
+    // removed placements per attempt before starting over
+    public int MaxDeletions = 2000;
 
-    // treat the source maps as wrapping around at their edges
-    public bool PeriodicInput;
+    // attempts with different random choices before giving up
+    public int MaxAttempts = 30;
 
-    // factor (0..1) on a pattern's probability for each height layer away from where it was seen in the sources;
-    // small values strongly prefer the sources' heights without forbidding others
-    public double HeightPenalty = 0.5;
+    // reject candidates that would leave a free neighbour without candidates
+    public bool Lookahead = true;
 
-    // edge length in voxels of the coarse blocks WFC works on; heights come in steps of this size
-    public int BlockSize = WfcTerrainGenerator.DefaultBlockSize;
+    // repairs of the same cell before the placements in a box around it are cleared; 0 never clears
+    public int ClearEvery = 8;
 
-    // share of a block's voxels that must be solid for the block to count as solid; low values keep thin
-    // details (ridges, pillars, overhangs), high values give chunkier terrain
-    public double SolidThreshold = 0.25;
-
-    // keep the most frequent patterns until they cover this share of all occurrences; drops rare patterns, which are
-    // most of the patterns of large source sets but little of their terrain
-    public double PatternCoverage = 0.95;
-
-    // choices undone after contradictions (per attempt) before starting over with other random choices
-    public int MaxBacktracks = 2000;
-
-    // attempts with different random choices before giving up after contradictions
-    public int Attempts = 5;
-
-    public WfcCellSelection CellSelection = WfcCellSelection.LowestEntropy;
+    // factor (0..1) on a pattern's weight for each cell layer (pattern height - 1 voxels) away from where it was seen
+    // in the sources; 1 ignores heights
+    public double HeightPenalty = 0.25;
 
     public int Seed;
 
@@ -66,126 +32,167 @@ public sealed class WfcSettings
     }
 }
 
-// Generates terrain with 3D overlapping-model wave function collapse, learning voxel patterns from source maps.
-// WFC runs on a coarse grid of voxel blocks (4 x 4 x 4 by default): patterns of single voxels are far too small to
-// capture Timberborn's terraces and cliffs (they degenerate into pillars), while coarse patterns span many tiles and
-// keep the number of distinct patterns small. Blocks are scaled back up afterwards, so heights come in steps of the
-// block size.
+public readonly struct WfcAttempt
+{
+    public WfcAttempt(bool solved, int placements, int repairs, int deletions, int lookaheadRejections, long ms)
+    {
+        Solved = solved;
+        Placements = placements;
+        Repairs = repairs;
+        Deletions = deletions;
+        LookaheadRejections = lookaheadRejections;
+        Milliseconds = ms;
+    }
+
+    public bool Solved { get; }
+    public int Placements { get; }
+    public int Repairs { get; }
+    public int Deletions { get; }
+    public int LookaheadRejections { get; }
+    public long Milliseconds { get; }
+
+    public override string ToString()
+    {
+        return $"{(Solved ? "solved" : "failed")} in {Milliseconds} ms: {Placements} placements, {Repairs} repairs, " +
+               $"{Deletions} deletions, {LookaheadRejections} lookahead rejections";
+    }
+}
+
+// Generates terrain with face-lookup wave function collapse (docs/wfc-face-lookup.md): voxel patterns from the source
+// maps are placed on a grid whose cells lie one less than the pattern size apart, so neighbours share one voxel layer
+// and fit exactly when that face is equal. The grid covers the map rounded up to whole cells and is cropped afterwards.
 public sealed class WfcTerrainGenerator
 {
-    public const int DefaultBlockSize = 4;
+    public const string NoSolutionKey = "Ximsa.TerrainGenerator.Wfc.NoSolution";
 
     private readonly WfcSettings settings;
-    private WfcPatternSet? patterns;
+    private WfcPatternIndex? index;
 
     public WfcTerrainGenerator(WfcSettings settings)
     {
         this.settings = settings;
     }
 
-    public int PatternCount => patterns?.Count ?? 0;
+    public WfcPatternIndex Index => index ?? throw new InvalidOperationException("Learn must run first");
 
-    public int AttemptsUsed { get; private set; }
+    // share of solid voxels per height, averaged over the sources that reach that height
+    public double[] SourceProfile { get; private set; } = Array.Empty<double>();
 
-    public int Backtracks { get; private set; }
+    public List<WfcAttempt> Attempts { get; } = new();
 
-    public void Learn(IEnumerable<VoxelMap> sources, Action<float>? progress = null)
+    public void Learn(IReadOnlyList<VoxelMap> sources, Action<float>? progress = null)
     {
-        if (settings.BlockSize < 1)
-            throw new ArgumentOutOfRangeException(nameof(settings.BlockSize), "Must be at least 1");
-        if (settings.PatternCoverage <= 0 || settings.PatternCoverage > 1)
-            throw new ArgumentOutOfRangeException(nameof(settings.PatternCoverage), "Must be above 0 and at most 1");
-        if (settings.SolidThreshold < 0 || settings.SolidThreshold > 1)
-            throw new ArgumentOutOfRangeException(nameof(settings.SolidThreshold), "Must be between 0 and 1");
-        var coarseSources = sources.Select(map => Downsample(map, settings.SolidThreshold, settings.BlockSize));
-        patterns = WfcPatternSet.Learn(coarseSources,
-            settings.PatternSize, settings.Symmetry, settings.PeriodicInput, settings.HeightPenalty,
-            settings.PatternCoverage, progress);
+        index = WfcPatternIndex.Learn(new WfcPatternShape(settings.PatternWidth, settings.PatternHeight), sources,
+            progress);
+        var height = sources.Max(map => map.SizeZ);
+        var sums = new double[height];
+        var counts = new int[height];
+        foreach (var map in sources)
+        {
+            var profile = FillProfile(map);
+            for (var z = 0; z < profile.Length; z++)
+            {
+                sums[z] += profile[z];
+                counts[z]++;
+            }
+        }
+
+        SourceProfile = sums.Select((sum, z) => sum / counts[z]).ToArray();
     }
 
     // sizes are the Timberborn map size: x and y across, z up; the bottom layer is always solid
     public VoxelMap Generate(int sizeX, int sizeY, int sizeZ, Action<float>? progress = null)
     {
-        if (patterns == null)
-            throw new InvalidOperationException("Learn must run first");
-        var n = patterns.Size;
-        var blockSize = settings.BlockSize;
-        int coarseX = Blocks(sizeX, blockSize), coarseY = Blocks(sizeY, blockSize), coarseZ = Blocks(sizeZ, blockSize);
-        if (coarseX < n || coarseY < n || coarseZ < n)
-            throw new InvalidOperationException("The map is too small for the pattern size");
-        for (var attempt = 0; attempt < settings.Attempts; attempt++)
+        var patterns = Index;
+        var shape = patterns.Shape;
+        Attempts.Clear();
+        int cellsX = Cells(sizeX, shape.StrideAcross), cellsY = Cells(sizeY, shape.StrideAcross),
+            cellsZ = Cells(sizeZ, shape.StrideUp);
+        var layerWeights = patterns.LayerWeights(cellsZ, settings.HeightPenalty);
+        for (var attempt = 0; attempt < settings.MaxAttempts; attempt++)
         {
-            AttemptsUsed = attempt + 1;
-            var solver = new WfcSolver(patterns, coarseX - n + 1, coarseY - n + 1, coarseZ - n + 1,
-                new Random(settings.Seed + attempt * 7919), settings.MaxBacktracks, settings.CellSelection);
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var solver = new WfcSolver(patterns, cellsX, cellsY, cellsZ, new Random(settings.Seed + attempt * 7919),
+                settings.MaxDeletions, settings.Lookahead, settings.ClearEvery, layerWeights);
             var solved = solver.Run(progress);
-            Backtracks += solver.Backtracks;
+            Attempts.Add(new WfcAttempt(solved, solver.Placements, solver.Repairs, solver.Deletions,
+                solver.LookaheadRejections, stopwatch.ElapsedMilliseconds));
             if (solved)
-                return Upsample(ToCoarseVoxels(solver, coarseX, coarseY, coarseZ), sizeX, sizeY, sizeZ, blockSize);
+                return Materialise(solver, sizeX, sizeY, sizeZ);
         }
 
-        throw new InvalidOperationException(
-            $"Wave function collapse ran into contradictions {settings.Attempts} times; " +
-            "try another seed, a smaller pattern size or other source maps");
+        throw new GenerationFailedException(NoSolutionKey,
+            $"Wave function collapse did not finish in {settings.MaxAttempts} attempts; try other source maps");
     }
 
-    private static int Blocks(int size, int blockSize)
+    // cells stride apart needed to cover size voxels (each cell covers stride + 1)
+    private static int Cells(int size, int stride)
     {
-        return (size + blockSize - 1) / blockSize;
+        return Math.Max(1, (size - 1 + stride - 1) / stride);
     }
 
-    // a block is solid when at least the given share of its voxels (within the map) is solid
-    public static VoxelMap Downsample(VoxelMap map, double solidThreshold, int blockSize = DefaultBlockSize)
+    private VoxelMap Materialise(WfcSolver solver, int sizeX, int sizeY, int sizeZ)
     {
-        int coarseX = Blocks(map.SizeX, blockSize), coarseY = Blocks(map.SizeY, blockSize),
-            coarseZ = Blocks(map.SizeZ, blockSize);
-        var coarse = new VoxelMap(coarseX, coarseY, coarseZ, new bool[coarseX * coarseY * coarseZ]);
-        for (var cz = 0; cz < coarseZ; cz++)
-        for (var cy = 0; cy < coarseY; cy++)
-        for (var cx = 0; cx < coarseX; cx++)
+        var shape = Index.Shape;
+        var map = new VoxelMap(sizeX, sizeY, sizeZ, new bool[sizeX * sizeY * sizeZ]);
+        var written = new bool[map.Voxels.Length];
+        var mismatches = 0;
+        for (var cz = 0; cz < solver.SizeZ; cz++)
+        for (var cy = 0; cy < solver.SizeY; cy++)
+        for (var cx = 0; cx < solver.SizeX; cx++)
         {
-            int solid = 0, total = 0;
-            for (var z = cz * blockSize; z < Math.Min(map.SizeZ, (cz + 1) * blockSize); z++)
-            for (var y = cy * blockSize; y < Math.Min(map.SizeY, (cy + 1) * blockSize); y++)
-            for (var x = cx * blockSize; x < Math.Min(map.SizeX, (cx + 1) * blockSize); x++)
+            var code = Index.OrientedCode(solver.PatternAt(cx, cy, cz));
+            for (var dz = 0; dz < shape.Height; dz++)
+            for (var dy = 0; dy < shape.Width; dy++)
+            for (var dx = 0; dx < shape.Width; dx++)
             {
-                total++;
-                if (map[x, y, z])
-                    solid++;
+                int x = cx * shape.StrideAcross + dx, y = cy * shape.StrideAcross + dy, z = cz * shape.StrideUp + dz;
+                if (x >= sizeX || y >= sizeY || z >= sizeZ)
+                    continue;
+                var i = (z * sizeY + y) * sizeX + x;
+                var solid = shape.Voxel(code, dx, dy, dz);
+                // shared layers are written twice and must agree
+                if (written[i] && map.Voxels[i] != solid)
+                    mismatches++;
+                written[i] = true;
+                map.Voxels[i] = solid;
             }
-
-            coarse[cx, cy, cz] = solid >= solidThreshold * total;
         }
 
-        return coarse;
+        if (mismatches > 0)
+            throw new InvalidOperationException($"{mismatches} voxels differ between neighbouring patterns");
+        for (var i = 0; i < sizeX * sizeY; i++)
+            map.Voxels[i] = true;
+        return map;
     }
 
-    public static VoxelMap Upsample(VoxelMap coarse, int sizeX, int sizeY, int sizeZ,
-        int blockSize = DefaultBlockSize)
+    // share of pattern-sized windows (stride 1) of the map that never occur in the sources
+    public double Novelty(VoxelMap map)
     {
-        var voxels = new VoxelMap(sizeX, sizeY, sizeZ, new bool[sizeX * sizeY * sizeZ]);
-        for (var z = 0; z < sizeZ; z++)
-        for (var y = 0; y < sizeY; y++)
-        for (var x = 0; x < sizeX; x++)
-            voxels[x, y, z] = z == 0 || coarse[x / blockSize, y / blockSize, z / blockSize];
-        return voxels;
-    }
-
-    // each coarse voxel comes from the pattern of the nearest cell, at its offset within that pattern
-    private VoxelMap ToCoarseVoxels(WfcSolver solver, int sizeX, int sizeY, int sizeZ)
-    {
-        var n = patterns!.Size;
-        var voxels = new VoxelMap(sizeX, sizeY, sizeZ, new bool[sizeX * sizeY * sizeZ]);
-        for (var z = 0; z < sizeZ; z++)
-        for (var y = 0; y < sizeY; y++)
-        for (var x = 0; x < sizeX; x++)
+        long total = 0, unseen = 0;
+        WfcPatternIndex.ForEachWindow(Index.Shape, map, (_, canonical) =>
         {
-            int cx = Math.Min(x, solver.SizeX - 1), cy = Math.Min(y, solver.SizeY - 1),
-                cz = Math.Min(z, solver.SizeZ - 1);
-            var code = patterns.Codes[solver.PatternAt(cx, cy, cz)];
-            voxels[x, y, z] = ((code >> WfcPatternSet.Bit(n, x - cx, y - cy, z - cz)) & 1) != 0;
+            total++;
+            if (!Index.ContainsCanonical(canonical))
+                unseen++;
+        });
+        return total == 0 ? 0 : (double)unseen / total;
+    }
+
+    // share of solid voxels per height
+    public static double[] FillProfile(VoxelMap map)
+    {
+        var area = map.SizeX * map.SizeY;
+        var profile = new double[map.SizeZ];
+        for (var z = 0; z < map.SizeZ; z++)
+        {
+            var solid = 0;
+            for (var i = 0; i < area; i++)
+                if (map.Voxels[z * area + i])
+                    solid++;
+            profile[z] = (double)solid / area;
         }
 
-        return voxels;
+        return profile;
     }
 }

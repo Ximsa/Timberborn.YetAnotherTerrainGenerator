@@ -17,8 +17,8 @@ A second bottom-bar button group, **Terrain Tools**, built with the same group c
 | 0 Spikes | API found in game code (see findings); not yet confirmed in game |
 | 1 Group, smoothing, surface editing | Built; not yet tested in game |
 | 2 Cliff Sharpening | Built and previewed offline; not yet tested in game |
-| 3 River Carver | Built (dialog, water sources) and previewed offline; not yet tested in game |
-| 4 Tree Placement | Built (dialog, spawning) and previewed offline; not yet tested in game |
+| 3 River Carver | **Removed** (2026-11-08): it did not work properly in game; code, texts and icon deleted (see git history before this change) |
+| 4 Tree Placement | Built (dialog, spawning), tested in game; defaults lowered 2026-11-08 (too much forest) |
 | 5 Polish and release | 1.3.1 in `release/version-1.1`, placeholder icons for all tools, texts done; in-game testing still to do |
 
 ## Decisions
@@ -34,6 +34,8 @@ A second bottom-bar button group, **Terrain Tools**, built with the same group c
 | River depth | A river lowers the terrain by at most 1 block anywhere |
 | River water | A water source entity at each river head |
 | Trees | Noise-driven forest patches mixing tree species, and separate noise-driven patches mixing bush species; trees and bushes never share a patch |
+| Tree amount | Defaults lowered 2026-11-08: forest coverage 35% -> 20%, density 0.5 -> 0.35, water bonus 0.4 -> 0.3, so forests cover about 6% of all tiles instead of 16% (Diorama, Plains, Meander offline) |
+| Cliff Sharpening icon | New placeholder (2026-11-08): stepped terraces in the line style of the other icons |
 | Existing trees | Tree Placement removes all natural resources first, then places new ones |
 | Mode | All four tools are dialog tools (like the generators): settings, a seed, Apply |
 
@@ -107,7 +109,9 @@ The terrain tools work on a heightmap, but must not destroy 3D terrain:
 - Offline preview: `TerrainPreview sharpen <file.timber>`. On ThousandIslands (256 x 256) it takes about 0.7 s and
   keeps every height level (e.g. tiles at 16 stay 16, at 12 stay 12 on average).
 
-### Phase 3: River Carver
+### Phase 3: River Carver (removed 2026-11-08)
+
+Removed because it did not work properly in game. The notes below describe what was built.
 
 - For each river: pick random columns (seeded), hill-climb each (steepest ascent on a lightly smoothed surface, so
   terrace flats do not stall it) to a local top, and put the head on the climbed path a set number of tiles before

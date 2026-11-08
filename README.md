@@ -3,7 +3,7 @@
 A Timberborn mod (`Ximsa.TerrainGenerator`) that adds terrain generators and terrain tools to the **map editor**:
 
 - **Terrain Generators:** Autoencoder Generator, 3D Noise Generator, WFC Generator.
-- **Terrain Tools:** Terrain Smoothing, Cliff Sharpening, River Carver, Tree Placement.
+- **Terrain Tools:** Terrain Smoothing, Cliff Sharpening, Tree Placement.
 
 Each tool opens a dialog with a few settings; every action can be undone in one step with Ctrl+Z.
 

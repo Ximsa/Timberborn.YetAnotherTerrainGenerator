@@ -2,6 +2,7 @@ using NumSharp;
 using System.Diagnostics;
 using Timberborn.Localization;
 using Timberborn.TerrainGenerator.Core.Common;
+using Timberborn.TooltipSystem;
 using TimberUi.CommonUi;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -40,6 +41,7 @@ public abstract class TerrainJobDialog : DialogBoxElement
     private ProgressReporter progress = new();
     private ProgressBarWithLabel progressBar;
     private VisualElement progressContainer = null!;
+    private readonly List<(VisualElement Element, string LocKey)> tooltips = new();
 
     protected TerrainJobDialog(ILoc loc, MapEditorService mapEditorService)
     {
@@ -47,6 +49,20 @@ public abstract class TerrainJobDialog : DialogBoxElement
         this.mapEditorService = mapEditorService;
         // closing the dialog cancels a running computation
         RegisterCallback<DetachFromPanelEvent>(_ => cancellation?.Cancel());
+    }
+
+    // registers the tooltips added with WithTooltip; the tool calls this when it opens the dialog
+    public void RegisterTooltips(ITooltipRegistrar tooltipRegistrar)
+    {
+        foreach (var (element, locKey) in tooltips)
+            tooltipRegistrar.RegisterLocalizable(element, locKey);
+    }
+
+    // a hover text for a setting, keyed "<label key>.Tooltip", so labels can stay short
+    protected T WithTooltip<T>(string labelKey, T element) where T : VisualElement
+    {
+        tooltips.Add((element, labelKey + ".Tooltip"));
+        return element;
     }
 
     protected void AddProgressBar()
@@ -111,6 +127,14 @@ public abstract class TerrainJobDialog : DialogBoxElement
             Debug.Log("[TerrainGenerator] job cancelled, terrain left unchanged");
             progressBar.SetProgress(0, loc.T(CancelledKey));
         }
+        catch (GenerationFailedException failure)
+        {
+            // the input cannot give terrain: tell the user, without the game's error report
+            Debug.LogWarning($"[TerrainGenerator] {failure.Message}, terrain left unchanged");
+            var message = loc.T(failure.LocKey);
+            progressBar.SetProgress(0, message);
+            ShowFailure(message);
+        }
         catch (Exception exception)
         {
             Debug.LogException(exception);
@@ -127,6 +151,11 @@ public abstract class TerrainJobDialog : DialogBoxElement
             cancellation = null;
             startButton.SetEnabled(true);
         }
+    }
+
+    // shows why a job could not produce terrain, beyond the progress bar's label
+    protected virtual void ShowFailure(string message)
+    {
     }
 
     // runs steps on the main thread, yielding to the next frame whenever a frame's time budget is used up

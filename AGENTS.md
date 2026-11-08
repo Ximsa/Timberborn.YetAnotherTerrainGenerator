@@ -4,7 +4,7 @@ Yet Another Terrain Generator (mod id `Ximsa.TerrainGenerator`) is a Timberborn 
 two bottom-bar tool groups:
 
 - **Terrain Generators:** Autoencoder Generator, 3D Noise Generator, WFC Generator.
-- **Terrain Tools:** Terrain Smoothing, Cliff Sharpening, River Carver, Tree Placement.
+- **Terrain Tools:** Terrain Smoothing, Cliff Sharpening, Tree Placement.
 
 Every tool opens a dialog with settings; nothing reacts to clicks on the map.
 
@@ -12,8 +12,8 @@ Every tool opens a dialog with settings; nothing reacts to clicks on the map.
 
 | Path | What |
 |---|---|
-| `Core/<Feature>/` | Timberborn-independent algorithms (also compiled by the offline tools): `Common` (`VoxelMap`, `MapVoxelReader`, `Surface`, `TileQueue`), `Autoencoder`, `Noise3D`, `Wfc`, `Smoothing`, `CliffSharpening`, `Rivers`, `Trees` |
-| `Game/<Feature>/` | Map editor code: a tool (`*Tool.cs`) and a dialog (`*Dialog.cs`) per feature; `Game/Common` has `ModStarter`, `Configurator` (Bindito bindings, `MapEditor` context), `MapEditorService` (terrain, entities, undo), `EntityPlacer` (trees, bushes, water sources), `TerrainJobDialog`, group buttons |
+| `Core/<Feature>/` | Timberborn-independent algorithms (also compiled by the offline tools): `Common` (`VoxelMap`, `MapVoxelReader`, `Surface`, `TileQueue`), `Autoencoder`, `Noise3D`, `Wfc`, `Smoothing`, `CliffSharpening`, `Trees` |
+| `Game/<Feature>/` | Map editor code: a tool (`*Tool.cs`) and a dialog (`*Dialog.cs`) per feature; `Game/Common` has `ModStarter`, `Configurator` (Bindito bindings, `MapEditor` context), `MapEditorService` (terrain, entities, undo), `EntityPlacer` (trees, bushes), `TerrainJobDialog`, group buttons |
 | `Localizations/enUS.csv` | All UI texts |
 | `ToolGroups/` | `ToolGroupSpec` blueprints, one per bottom-bar group |
 | `Sprites/` | 256 x 256 button icons (line drawings: light grey fill, dark outline, transparent background) |
@@ -46,8 +46,8 @@ folders. Restart the game after deploying.
 ## Testing
 
 - There is no test project. Check algorithms offline with the preview tools, then in game.
-  - `dotnet run --project tools/TerrainPreview -- noise3d|wfc|map|sharpen|rivers|trees ... --out preview.png`
-    (usage at the top of its `Program.cs`; `--rivers N` works after any map-producing command).
+  - `dotnet run --project tools/TerrainPreview -- noise3d|wfc|wfc-test|map|sharpen|trees ... --out preview.png`
+    (usage at the top of its `Program.cs`).
   - `dotnet run --project tools/AutoencoderTuner -c Release -- preview|stats|sharpen ...`
     (see `docs/autoencoder-tuning.md`).
   - Built-in maps are not files on disk; they come from the game (`MapRepository`). For offline work, use user maps
@@ -68,7 +68,7 @@ folders. Restart the game after deploying.
 - Long work runs in `TerrainJobDialog.RunJob`: compute on a background thread (cancellable, reports progress through
   `ProgressReporter` with localization keys as stage names), then apply on the main thread spread over frames.
   Generators remove all entities; terrain tools pass `removeAllEntities: false` to remove only entities in changed
-  columns. Spawning trees or water sources goes in `placeEntities`, which also runs over frames.
+  columns. Spawning trees or bushes goes in `placeEntities`, which also runs over frames.
 - Undo: the game records every terrain change made through `ITerrainService` and every entity created or deleted
   as pending undo entries; `RunJob` commits them (`MapEditorService.CommitUndoStep`) before and after applying, so
   each tool action is one Ctrl+Z step. Do not write terrain or entities around these services, or undo misses it.
@@ -89,6 +89,5 @@ folders. Restart the game after deploying.
   `Key,"Text",-`. No trailing spaces inside texts (the game warns about them). Remove keys that are no longer used.
 - The 3D Noise generator used an old Minecraft version's generator as a baseline only: do not mention Minecraft or
   "beta" in code or texts, and name things after what they do (e.g. Hilliness, Ruggedness).
-- River beds lower the terrain by at most one block; only tunnels (out of full basins) cut deeper.
 - Keep the plan documents in `docs/` current: update status tables and record decisions and their reasons.
 - Commit only when asked, on the current feature branch, with a short summary line and a body explaining why.

@@ -1,430 +1,523 @@
 namespace Timberborn.TerrainGenerator.Core.Wfc;
 
-// Wave function collapse over a 3D grid of cells. Each cell keeps the set of patterns it may still take as a bitset;
-// the next cell (by default the lowest-entropy one, see WfcCellSelection) is collapsed to one weighted-random pattern
-// and the choice is propagated to neighbours,
-// until every cell is decided. On a contradiction (a cell with no pattern left) the solver backtracks: it undoes the
-// last choice, bans that pattern in that cell and propagates again, stepping further back if that fails too.
+// One attempt at filling a grid of cells with oriented patterns whose shared faces match
+// (docs/wfc-face-lookup.md, section 5). A cell's domain (its candidates) is a pure function of its placed neighbours
+// and its blacklist, so it is recomputed instead of propagated, and removing a placement needs no undo log.
+// The next cell is the one with the fewest candidates among cells next to placed ones. When a cell has no candidate
+// left, one of its placed neighbours is removed and that choice is blacklisted there; past the deletion limit the
+// attempt fails and the caller restarts.
 internal sealed class WfcSolver
 {
-    private readonly ulong[] candidates;
+    // weighted draws with rejection before ordering all remaining candidates at once
+    private const int QuickTries = 8;
+
+    private const int MaxClearRadius = 3;
+
+    private readonly int[] allIds;
+    private readonly int[] assigned;
+    private readonly HashSet<int>?[] blacklist;
     private readonly int cells;
-    private readonly int[] decidedPattern;
-    private readonly Stack<Decision> decisions = new();
-    // per cell: a random value in [0, 1) that breaks ties, or orders the cells for RandomOrder
-    private readonly double[] order;
+    private readonly int clearEvery;
+    private readonly Stack<int> contradictions = new();
+    private readonly IdRange[] domains;
     private readonly MinHeap heap = new();
-    private readonly int maxBacktracks;
-    private readonly WfcCellSelection selection;
-    private readonly WfcPatternSet patterns;
-    private readonly bool[] queued;
+    private readonly WfcPatternIndex index;
+    private readonly bool lookahead;
+
+    // [cell layer][pattern]
+    private readonly float[][] layerWeights;
+    private readonly int maxDeletions;
+
+    // [cell * 6 + direction]: the neighbouring cell, or -1 outside the grid
+    private readonly int[] neighbours;
     private readonly Random random;
-    private readonly int[] remaining;
+    private readonly List<int> rejected = new();
 
-    // undo log: every change of remaining counts, with the previous value
-    private readonly List<(int Cell, int Old)> remainingTrail = new();
+    // per cell: repairs started from it in this attempt
+    private readonly int[] repairsAt;
+    private readonly IdRange[] constraints = new IdRange[6];
 
-    // per cell: patterns lost since the cell was last propagated
-    private readonly ulong[] removed;
-    private readonly Stack<int> stack = new();
+    // shared buffer for intersections, copied out at the exact length
+    private int[] scratch = new int[1024];
     private readonly int[] version;
-    private readonly ulong[] wave;
+    private int assignedCount;
 
-    // undo log: every change of a wave word, with the previous value
-    private readonly List<(int Index, ulong Old)> waveTrail = new();
-
-    // [layer][pattern]: weight * log(weight), precomputed for the entropy
-    private readonly double[][] weightLogsByLayer;
-    private readonly int words;
-    private int decided;
-
-    public WfcSolver(WfcPatternSet patterns, int sizeX, int sizeY, int sizeZ, Random random, int maxBacktracks,
-        WfcCellSelection selection = WfcCellSelection.LowestEntropy)
+    // clearEvery: repairs of the same cell before a box around it is cleared; 0 never clears
+    public WfcSolver(WfcPatternIndex index, int sizeX, int sizeY, int sizeZ, Random random, int maxDeletions,
+        bool lookahead, int clearEvery, float[][] layerWeights)
     {
-        this.patterns = patterns;
+        this.index = index;
         this.random = random;
-        this.maxBacktracks = maxBacktracks;
-        this.selection = selection;
+        this.maxDeletions = maxDeletions;
+        this.lookahead = lookahead;
+        this.clearEvery = clearEvery;
+        this.layerWeights = layerWeights;
         SizeX = sizeX;
         SizeY = sizeY;
         SizeZ = sizeZ;
         cells = sizeX * sizeY * sizeZ;
-        words = patterns.Words;
-        wave = new ulong[cells * words];
-        removed = new ulong[cells * words];
-        queued = new bool[cells];
-        candidates = new ulong[words];
-        remaining = new int[cells];
+        repairsAt = new int[cells];
+        allIds = index.AllIds;
+        assigned = new int[cells];
+        blacklist = new HashSet<int>?[cells];
+        domains = new IdRange[cells];
         version = new int[cells];
-        decidedPattern = new int[cells];
-        order = new double[cells];
-        weightLogsByLayer = patterns.LayerWeights
-            .Select(weights => weights.Select(weight => weight * Math.Log(weight)).ToArray()).ToArray();
+        neighbours = new int[cells * 6];
+        for (var cell = 0; cell < cells; cell++)
+        {
+            assigned[cell] = -1;
+            domains[cell] = new IdRange(allIds, 0, allIds.Length);
+            int x = cell % sizeX, y = cell / sizeX % sizeY, z = cell / (sizeX * sizeY);
+            for (var d = 0; d < 6; d++)
+            {
+                var (dx, dy, dz) = WfcPatternShape.Directions[d];
+                int nx = x + dx, ny = y + dy, nz = z + dz;
+                neighbours[cell * 6 + d] = nx < 0 || ny < 0 || nz < 0 || nx >= sizeX || ny >= sizeY || nz >= sizeZ
+                    ? -1
+                    : (nz * sizeY + ny) * sizeX + nx;
+            }
+        }
     }
 
     public int SizeX { get; }
     public int SizeY { get; }
     public int SizeZ { get; }
-    public int Backtracks { get; private set; }
+    public int Placements { get; private set; }
+    public int Repairs { get; private set; }
+    public int Deletions { get; private set; }
+    public int LookaheadRejections { get; private set; }
 
-    // the pattern a cell collapsed to; only valid after Run returned true
+    // the oriented id placed at a cell; valid after Run returned true
     public int PatternAt(int x, int y, int z)
     {
-        return decidedPattern[Index(x, y, z)];
+        return assigned[(z * SizeY + y) * SizeX + x];
     }
 
-    // false if the contradictions could not be resolved within the backtracking limit
+    // false when the attempt ran past the deletion limit or got stuck, and should restart
     public bool Run(Action<float>? progress = null)
     {
-        Initialize();
-        var lastReported = 0f;
-        while (true)
+        var steps = 0;
+        var reported = 0f;
+        while (assignedCount < cells)
         {
+            if (++steps % 64 == 0)
+            {
+                // repairs can lower the fraction; the bar only moves forward
+                reported = Math.Max(reported, (float)assignedCount / cells);
+                progress?.Invoke(reported);
+            }
+
+            if (TryPopContradiction(out var broken))
+            {
+                if (!Repair(broken))
+                    return false;
+                continue;
+            }
+
+            // without placed cells (at the start, or if repairs removed them all) a random free cell seeds the grid
             var cell = NextCell();
             if (cell < 0)
-                break;
+                cell = RandomFreeCell();
             var chosen = Choose(cell);
-            decisions.Push(new Decision(cell, chosen, waveTrail.Count, remainingTrail.Count));
-            Collapse(cell, chosen);
-            while (!Propagate())
-                if (!Backtrack())
-                    return false;
-
-            var fraction = (float)decided / cells;
-            if (fraction - lastReported >= 0.005f)
+            if (chosen < 0)
             {
-                lastReported = fraction;
-                progress?.Invoke(fraction);
+                if (!Repair(cell))
+                    return false;
             }
+            else
+                Place(cell, chosen);
         }
 
-        for (var cell = 0; cell < cells; cell++)
-            decidedPattern[cell] = FirstPattern(cell);
         return true;
     }
 
-    private void Initialize()
+    private bool TryPopContradiction(out int cell)
     {
-        var full = new ulong[words];
-        for (var p = 0; p < patterns.Count; p++)
-            full[p >> 6] |= 1UL << (p & 63);
-        for (var cell = 0; cell < cells; cell++)
+        while (contradictions.Count > 0)
         {
-            Array.Copy(full, 0, wave, cell * words, words);
-            remaining[cell] = patterns.Count;
-            order[cell] = random.NextDouble();
-            if (patterns.Count > 1)
-                Push(cell);
-            else
-                decided++;
+            cell = contradictions.Pop();
+            if (assigned[cell] < 0 && domains[cell].Count == 0)
+                return true;
         }
+
+        cell = -1;
+        return false;
     }
 
-    // the undecided cell with the lowest priority, or -1 when all cells are decided
+    // the free cell with the fewest candidates among cells next to placed ones (ties random), or -1
     private int NextCell()
     {
         while (heap.Count > 0)
         {
             var (cell, cellVersion) = heap.Pop();
-            if (remaining[cell] > 1 && cellVersion == version[cell])
+            if (assigned[cell] < 0 && cellVersion == version[cell] && domains[cell].Count > 0)
                 return cell;
         }
 
         return -1;
     }
 
-    // a weighted-random pattern among the cell's remaining ones, using the weights at the cell's height
+    private int RandomFreeCell()
+    {
+        var start = random.Next(cells);
+        for (var i = 0; i < cells; i++)
+        {
+            var cell = (start + i) % cells;
+            if (assigned[cell] < 0)
+                return cell;
+        }
+
+        throw new InvalidOperationException("No free cell left");
+    }
+
+    // a weighted-random candidate that leaves every free neighbour at least one candidate, or -1. Candidates are
+    // tested in weighted-random order and the first that passes wins, which picks with the same odds as filtering
+    // the whole domain first, but usually tests only one.
     private int Choose(int cell)
     {
-        var offset = cell * words;
-        var weights = WeightsOf(cell);
+        var domain = domains[cell];
+        if (domain.Count == 0)
+            return -1;
+        var weights = layerWeights[cell / (SizeX * SizeY)];
         var total = 0.0;
-        for (var w = 0; w < words; w++)
-            for (var bits = wave[offset + w]; bits != 0; bits &= bits - 1)
-                total += weights[w * 64 + Bits.TrailingZeros(bits)];
+        for (var i = 0; i < domain.Count; i++)
+            total += weights[domain[i] >> 2];
+        rejected.Clear();
+        for (var tries = 0; tries < QuickTries && rejected.Count < domain.Count; tries++)
+        {
+            var i = WeightedPick(domain, weights, total);
+            var id = domain[i];
+            if (!lookahead || Fits(cell, id))
+                return id;
+            LookaheadRejections++;
+            rejected.Add(i);
+            total -= weights[id >> 2];
+        }
+
+        if (rejected.Count == domain.Count)
+            return -1;
+        // all others in one weighted-random order (exponential keys, smallest first)
+        var order = new List<(double Key, int Id)>(domain.Count - rejected.Count);
+        for (var i = 0; i < domain.Count; i++)
+            if (!rejected.Contains(i))
+                order.Add((-Math.Log(1 - random.NextDouble()) / weights[domain[i] >> 2], domain[i]));
+        order.Sort((a, b) => a.Key.CompareTo(b.Key));
+        foreach (var (_, id) in order)
+        {
+            if (Fits(cell, id))
+                return id;
+            LookaheadRejections++;
+        }
+
+        return -1;
+    }
+
+    // a weighted-random position in the domain, skipping rejected positions; total is their weight sum
+    private int WeightedPick(IdRange domain, float[] weights, double total)
+    {
         var pick = random.NextDouble() * total;
         var last = -1;
-        for (var w = 0; w < words; w++)
-            for (var bits = wave[offset + w]; bits != 0; bits &= bits - 1)
-            {
-                last = w * 64 + Bits.TrailingZeros(bits);
-                pick -= weights[last];
-                if (pick <= 0)
-                    return last;
-            }
+        for (var i = 0; i < domain.Count; i++)
+        {
+            if (rejected.Count > 0 && rejected.Contains(i))
+                continue;
+            last = i;
+            pick -= weights[domain[i] >> 2];
+            if (pick <= 0)
+                return i;
+        }
 
         return last;
     }
 
-    private void Collapse(int cell, int chosen)
+    // one-step lookahead: every free neighbour keeps a candidate that fits the shared face
+    private bool Fits(int cell, int id)
     {
-        var offset = cell * words;
-        for (var w = 0; w < words; w++)
+        for (var d = 0; d < 6; d++)
         {
-            var keep = w == chosen >> 6 ? 1UL << (chosen & 63) : 0;
-            removed[offset + w] |= wave[offset + w] & ~keep;
-            SetWord(offset + w, keep);
+            var neighbour = neighbours[cell * 6 + d];
+            if (neighbour < 0 || assigned[neighbour] >= 0)
+                continue;
+            if (!Intersects(domains[neighbour], index.NeighbourCandidates(id, d)))
+                return false;
         }
 
-        ApplyChange(cell, 1);
+        return true;
     }
 
-    // undoes decisions until one can be replaced: the pattern it chose is banned from its cell and the result
-    // propagates without contradiction. False when out of decisions or over the backtracking limit.
-    private bool Backtrack()
+    private void Place(int cell, int id)
     {
-        while (decisions.Count > 0)
+        assigned[cell] = id;
+        assignedCount++;
+        Placements++;
+        // a new constraint only narrows the neighbours' domains, so intersecting with it equals recomputing them
+        for (var d = 0; d < 6; d++)
         {
-            ClearPropagation();
-            if (++Backtracks > maxBacktracks)
-                return false;
-            var decision = decisions.Pop();
-            Undo(decision.WaveMark, decision.RemainingMark);
-            // the ban is logged as part of the previous decision, so stepping further back also lifts it
-            if (Ban(decision.Cell, decision.Pattern) && Propagate())
-                return true;
+            var neighbour = neighbours[cell * 6 + d];
+            if (neighbour < 0 || assigned[neighbour] >= 0)
+                continue;
+            var fitting = index.NeighbourCandidates(id, d);
+            SetDomain(neighbour, Intersect(domains[neighbour], fitting), true);
+        }
+    }
+
+    // removes the placed neighbour whose constraint frees the cell up most, blacklisting its choice there;
+    // false once the attempt should restart
+    private bool Repair(int cell)
+    {
+        if (Deletions >= maxDeletions)
+            return false;
+        Repairs++;
+        // a cell that keeps failing sits in a trap that removing single neighbours does not open, as the conflict is
+        // often with a free neighbour's other neighbours; clear a box around it instead, growing with each repeat
+        if (clearEvery > 0 && ++repairsAt[cell] % clearEvery == 0)
+        {
+            ClearAround(cell, Math.Min(MaxClearRadius, repairsAt[cell] / clearEvery));
+            return true;
         }
 
-        ClearPropagation();
+        var best = -1;
+        var bestGain = 0;
+        var ties = 0;
+        var placed = 0;
+        for (var d = 0; d < 6; d++)
+        {
+            var neighbour = neighbours[cell * 6 + d];
+            if (neighbour < 0 || assigned[neighbour] < 0)
+                continue;
+            placed++;
+            var gain = ComputeDomain(cell, d, out _).Count;
+            // the largest gain wins, ties (and all-zero gains) broken at random
+            if (gain > bestGain)
+            {
+                best = neighbour;
+                bestGain = gain;
+                ties = 1;
+            }
+            else if (gain == bestGain && random.Next(++ties) == 0)
+                best = neighbour;
+        }
+
+        if (placed == 0)
+            return false;
+        Unassign(best);
+        return true;
+    }
+
+    // removes every placement within radius cells (a box) and forgets the blacklists there, as they were learned
+    // around placements that are now gone
+    private void ClearAround(int cell, int radius)
+    {
+        int x = cell % SizeX, y = cell / SizeX % SizeY, z = cell / (SizeX * SizeY);
+        for (var pass = 0; pass < 2; pass++)
+        for (var cz = Math.Max(0, z - radius - 1); cz <= Math.Min(SizeZ - 1, z + radius + 1); cz++)
+        for (var cy = Math.Max(0, y - radius - 1); cy <= Math.Min(SizeY - 1, y + radius + 1); cy++)
+        for (var cx = Math.Max(0, x - radius - 1); cx <= Math.Min(SizeX - 1, x + radius + 1); cx++)
+        {
+            var inside = Math.Abs(cx - x) <= radius && Math.Abs(cy - y) <= radius && Math.Abs(cz - z) <= radius;
+            var target = (cz * SizeY + cy) * SizeX + cx;
+            if (pass == 0 && inside)
+            {
+                // first remove, then recompute the box and its rim once all removals are done
+                blacklist[target] = null;
+                if (assigned[target] < 0)
+                    continue;
+                assigned[target] = -1;
+                assignedCount--;
+                Deletions++;
+            }
+            else if (pass == 1 && assigned[target] < 0)
+                Recompute(target);
+        }
+    }
+
+    private void Unassign(int cell)
+    {
+        (blacklist[cell] ??= new HashSet<int>()).Add(assigned[cell]);
+        assigned[cell] = -1;
+        assignedCount--;
+        Deletions++;
+        Recompute(cell);
+        for (var d = 0; d < 6; d++)
+        {
+            var neighbour = neighbours[cell * 6 + d];
+            if (neighbour >= 0 && assigned[neighbour] < 0)
+                Recompute(neighbour);
+        }
+    }
+
+    private void Recompute(int cell)
+    {
+        var domain = ComputeDomain(cell, -1, out var constrained);
+        SetDomain(cell, domain, constrained);
+    }
+
+    // constrained: the cell has a placed neighbour, so it may be picked next
+    private void SetDomain(int cell, IdRange domain, bool constrained)
+    {
+        domains[cell] = domain;
+        version[cell]++;
+        if (domain.Count == 0)
+            contradictions.Push(cell);
+        else if (constrained)
+            heap.Push(domain.Count + random.NextDouble(), cell, version[cell]);
+    }
+
+    // the intersection of the candidate lists of all placed neighbours (except the one in direction skip), shortest
+    // first, minus the blacklist; all ids if no neighbour is placed
+    private IdRange ComputeDomain(int cell, int skip, out bool constrained)
+    {
+        var count = 0;
+        for (var d = 0; d < 6; d++)
+        {
+            var neighbour = neighbours[cell * 6 + d];
+            if (d == skip || neighbour < 0 || assigned[neighbour] < 0)
+                continue;
+            constraints[count++] = index.NeighbourCandidates(assigned[neighbour], d ^ 1);
+        }
+
+        constrained = count > 0;
+        IdRange domain;
+        if (count == 0)
+            domain = new IdRange(allIds, 0, allIds.Length);
+        else
+        {
+            Array.Sort(constraints, 0, count, IdRangeByCount.Instance);
+            domain = constraints[0];
+            for (var i = 1; i < count && domain.Count > 0; i++)
+                domain = Intersect(domain, constraints[i]);
+        }
+
+        return WithoutBlacklist(cell, domain);
+    }
+
+    private IdRange WithoutBlacklist(int cell, IdRange domain)
+    {
+        var banned = blacklist[cell];
+        if (banned == null)
+            return domain;
+        var hits = 0;
+        for (var i = 0; i < domain.Count; i++)
+            if (banned.Contains(domain[i]))
+                hits++;
+        if (hits == 0)
+            return domain;
+        var kept = new int[domain.Count - hits];
+        var n = 0;
+        for (var i = 0; i < domain.Count; i++)
+            if (!banned.Contains(domain[i]))
+                kept[n++] = domain[i];
+        return new IdRange(kept, 0, n);
+    }
+
+    private bool IsAll(IdRange range)
+    {
+        return range.Items == allIds && range.Count == allIds.Length;
+    }
+
+    // sorted-list intersection: a linear merge, or binary searches in the longer list when lengths differ a lot
+    private IdRange Intersect(IdRange a, IdRange b)
+    {
+        if (IsAll(a))
+            return b;
+        if (IsAll(b))
+            return a;
+        if (a.Count > b.Count)
+            (a, b) = (b, a);
+        if (a.Count == 0)
+            return IdRange.Empty;
+        if (scratch.Length < a.Count)
+            scratch = new int[Math.Max(a.Count, scratch.Length * 2)];
+        var n = 0;
+        int ai = a.Start, aEnd = a.Start + a.Count, bi = b.Start, bEnd = b.Start + b.Count;
+        if (b.Count > 8 * a.Count)
+            for (; ai < aEnd && bi < bEnd; ai++)
+            {
+                bi = LowerBound(b.Items, bi, bEnd, a.Items[ai]);
+                if (bi < bEnd && b.Items[bi] == a.Items[ai])
+                    scratch[n++] = b.Items[bi++];
+            }
+        else
+            while (ai < aEnd && bi < bEnd)
+            {
+                int x = a.Items[ai], y = b.Items[bi];
+                if (x < y)
+                    ai++;
+                else if (x > y)
+                    bi++;
+                else
+                {
+                    scratch[n++] = x;
+                    ai++;
+                    bi++;
+                }
+            }
+
+        if (n == 0)
+            return IdRange.Empty;
+        var result = new int[n];
+        Array.Copy(scratch, result, n);
+        return new IdRange(result, 0, n);
+    }
+
+    private bool Intersects(IdRange a, IdRange b)
+    {
+        if (IsAll(a))
+            return b.Count > 0;
+        if (IsAll(b))
+            return a.Count > 0;
+        if (a.Count > b.Count)
+            (a, b) = (b, a);
+        int ai = a.Start, aEnd = a.Start + a.Count, bi = b.Start, bEnd = b.Start + b.Count;
+        if (b.Count > 8 * a.Count)
+        {
+            for (; ai < aEnd && bi < bEnd; ai++)
+            {
+                bi = LowerBound(b.Items, bi, bEnd, a.Items[ai]);
+                if (bi < bEnd && b.Items[bi] == a.Items[ai])
+                    return true;
+            }
+
+            return false;
+        }
+
+        while (ai < aEnd && bi < bEnd)
+        {
+            int x = a.Items[ai], y = b.Items[bi];
+            if (x == y)
+                return true;
+            if (x < y)
+                ai++;
+            else
+                bi++;
+        }
+
         return false;
     }
 
-    private bool Ban(int cell, int pattern)
+    // the first position in [start, end) whose value is at least value
+    private static int LowerBound(int[] items, int start, int end, int value)
     {
-        var index = cell * words + (pattern >> 6);
-        var bit = 1UL << (pattern & 63);
-        if ((wave[index] & bit) == 0)
-            return true;
-        SetWord(index, wave[index] & ~bit);
-        removed[index] |= bit;
-        return ApplyChange(cell, remaining[cell] - 1);
-    }
-
-    private void Undo(int waveMark, int remainingMark)
-    {
-        for (var i = waveTrail.Count - 1; i >= waveMark; i--)
-            wave[waveTrail[i].Index] = waveTrail[i].Old;
-        waveTrail.RemoveRange(waveMark, waveTrail.Count - waveMark);
-
-        for (var i = remainingTrail.Count - 1; i >= remainingMark; i--)
+        while (start < end)
         {
-            var (cell, old) = remainingTrail[i];
-            if (remaining[cell] == 1 && old > 1)
-                decided--;
-            remaining[cell] = old;
-            if (old > 1)
-                Push(cell);
+            var middle = (start + end) >> 1;
+            if (items[middle] < value)
+                start = middle + 1;
+            else
+                end = middle;
         }
 
-        remainingTrail.RemoveRange(remainingMark, remainingTrail.Count - remainingMark);
+        return start;
     }
 
-    // drops pending propagation after a contradiction
-    private void ClearPropagation()
+    private sealed class IdRangeByCount : IComparer<IdRange>
     {
-        stack.Clear();
-        Array.Clear(queued, 0, queued.Length);
-        Array.Clear(removed, 0, removed.Length);
-    }
+        public static readonly IdRangeByCount Instance = new();
 
-    // processes cells that lost patterns: only neighbour patterns that one of the lost patterns could support may
-    // have lost their last support, and the direction tables (Propagator) list exactly those, so only they are
-    // re-checked. False on contradiction.
-    private bool Propagate()
-    {
-        while (stack.Count > 0)
+        public int Compare(IdRange a, IdRange b)
         {
-            var cell = stack.Pop();
-            queued[cell] = false;
-            var z = cell / (SizeX * SizeY);
-            var y = cell / SizeX % SizeY;
-            var x = cell % SizeX;
-            for (var d = 0; d < WfcPatternSet.Directions.Length; d++)
-            {
-                var (dx, dy, dz) = WfcPatternSet.Directions[d];
-                int nx = x + dx, ny = y + dy, nz = z + dz;
-                if (nx < 0 || ny < 0 || nz < 0 || nx >= SizeX || ny >= SizeY || nz >= SizeZ)
-                    continue;
-                if (!RemoveUnsupported(Index(nx, ny, nz), cell, d))
-                    return false;
-            }
-
-            Array.Clear(removed, cell * words, words);
+            return a.Count.CompareTo(b.Count);
         }
-
-        return true;
-    }
-
-    // the neighbour lies in direction d from cell; removes its patterns that lost their last support in cell.
-    // False on contradiction.
-    private bool RemoveUnsupported(int neighbour, int cell, int d)
-    {
-        var neighbourOffset = neighbour * words;
-        var cellOffset = cell * words;
-
-        // candidates: neighbour patterns that a pattern the cell lost could have supported
-        Array.Clear(candidates, 0, words);
-        for (var w = 0; w < words; w++)
-            for (var lost = removed[cellOffset + w]; lost != 0; lost &= lost - 1)
-            {
-                var supportedByLost = patterns.Propagator[
-                    (w * 64 + Bits.TrailingZeros(lost)) * WfcPatternSet.Directions.Length + d];
-                for (var i = 0; i < words; i++)
-                    candidates[i] |= supportedByLost[i];
-            }
-
-        // a candidate keeps its place if some pattern still left in the cell supports it
-        var towardsCell = d ^ 1;
-        var removedAny = false;
-        for (var w = 0; w < words; w++)
-        {
-            var kept = wave[neighbourOffset + w];
-            for (var bits = candidates[w] & kept; bits != 0; bits &= bits - 1)
-            {
-                var q = w * 64 + Bits.TrailingZeros(bits);
-                var compatible = patterns.Propagator[q * WfcPatternSet.Directions.Length + towardsCell];
-                var supported = false;
-                for (var i = 0; i < words; i++)
-                    if ((compatible[i] & wave[cellOffset + i]) != 0)
-                    {
-                        supported = true;
-                        break;
-                    }
-
-                if (!supported)
-                    kept &= ~(1UL << (q & 63));
-            }
-
-            var lostHere = wave[neighbourOffset + w] & ~kept;
-            if (lostHere == 0)
-                continue;
-            removed[neighbourOffset + w] |= lostHere;
-            SetWord(neighbourOffset + w, kept);
-            removedAny = true;
-        }
-
-        if (!removedAny)
-            return true;
-        var count = 0;
-        for (var w = 0; w < words; w++)
-            count += Bits.PopCount(wave[neighbourOffset + w]);
-        return ApplyChange(neighbour, count);
-    }
-
-    // after a cell lost patterns: records how many remain, requeues it with its new priority and schedules it for
-    // propagation; false on contradiction
-    private bool ApplyChange(int cell, int count)
-    {
-        if (count == 0)
-            return false;
-        remainingTrail.Add((cell, remaining[cell]));
-        if (remaining[cell] > 1 && count == 1)
-            decided++;
-        remaining[cell] = count;
-        if (count > 1)
-            Push(cell);
-        if (!queued[cell])
-        {
-            queued[cell] = true;
-            stack.Push(cell);
-        }
-
-        return true;
-    }
-
-    private void SetWord(int index, ulong value)
-    {
-        if (wave[index] == value)
-            return;
-        waveTrail.Add((index, wave[index]));
-        wave[index] = value;
-    }
-
-    private void Push(int cell)
-    {
-        version[cell]++;
-        heap.Push(Priority(cell), cell, version[cell]);
-    }
-
-    // lower is collapsed first; the random order value breaks ties
-    private double Priority(int cell)
-    {
-        const double tie = 1e-6;
-        var layer = cell / (SizeX * SizeY);
-        switch (selection)
-        {
-            case WfcCellSelection.FewestPatterns:
-                return remaining[cell] + order[cell] * 0.5;
-            case WfcCellSelection.LayerByLayer:
-                // entropy stays far below 1000 (it is at most the log of the pattern count)
-                return layer * 1000 + Entropy(cell) + order[cell] * tie;
-            case WfcCellSelection.Scanline:
-                return cell;
-            case WfcCellSelection.CentreOutward:
-            {
-                double dx = cell % SizeX - (SizeX - 1) / 2.0, dy = cell / SizeX % SizeY - (SizeY - 1) / 2.0;
-                return Math.Round(Math.Sqrt(dx * dx + dy * dy)) * 1000 + Entropy(cell) + order[cell] * tie;
-            }
-            case WfcCellSelection.RandomOrder:
-                return order[cell];
-            default:
-                return Entropy(cell) + order[cell] * tie;
-        }
-    }
-
-    // Shannon entropy of the cell's remaining patterns, weighted by their probability at the cell's height
-    private double Entropy(int cell)
-    {
-        var sum = 0.0;
-        var sumLog = 0.0;
-        var layer = patterns.LayerOf(cell / (SizeX * SizeY));
-        var weights = patterns.LayerWeights[layer];
-        var weightLogs = weightLogsByLayer[layer];
-        var offset = cell * words;
-        for (var w = 0; w < words; w++)
-            for (var bits = wave[offset + w]; bits != 0; bits &= bits - 1)
-            {
-                var p = w * 64 + Bits.TrailingZeros(bits);
-                sum += weights[p];
-                sumLog += weightLogs[p];
-            }
-
-        return Math.Log(sum) - sumLog / sum;
-    }
-
-    private double[] WeightsOf(int cell)
-    {
-        return patterns.LayerWeights[patterns.LayerOf(cell / (SizeX * SizeY))];
-    }
-
-    private int FirstPattern(int cell)
-    {
-        var offset = cell * words;
-        for (var w = 0; w < words; w++)
-            if (wave[offset + w] != 0)
-                return w * 64 + Bits.TrailingZeros(wave[offset + w]);
-        return -1;
-    }
-
-    private int Index(int x, int y, int z)
-    {
-        return (z * SizeY + y) * SizeX + x;
-    }
-
-    private readonly struct Decision
-    {
-        public Decision(int cell, int pattern, int waveMark, int remainingMark)
-        {
-            Cell = cell;
-            Pattern = pattern;
-            WaveMark = waveMark;
-            RemainingMark = remainingMark;
-        }
-
-        public int Cell { get; }
-        public int Pattern { get; }
-        public int WaveMark { get; }
-        public int RemainingMark { get; }
     }
 
     // binary min-heap of (priority, cell, version); stale entries are skipped when popped
@@ -473,29 +566,5 @@ internal sealed class WfcSolver
 
             return (top.Cell, top.Version);
         }
-    }
-}
-
-internal static class Bits
-{
-    private static readonly int[] DeBruijn =
-    {
-        0, 1, 48, 2, 57, 49, 28, 3, 61, 58, 50, 42, 38, 29, 17, 4, 62, 55, 59, 36, 53, 51, 43, 22, 45, 39, 33, 30,
-        24, 18, 12, 5, 63, 47, 56, 27, 60, 41, 37, 16, 54, 35, 52, 21, 44, 32, 23, 11, 46, 26, 40, 15, 34, 20, 31,
-        10, 25, 14, 19, 9, 13, 8, 7, 6
-    };
-
-    public static int PopCount(ulong value)
-    {
-        value -= (value >> 1) & 0x5555555555555555UL;
-        value = (value & 0x3333333333333333UL) + ((value >> 2) & 0x3333333333333333UL);
-        value = (value + (value >> 4)) & 0x0F0F0F0F0F0F0F0FUL;
-        return (int)((value * 0x0101010101010101UL) >> 56);
-    }
-
-    // value must not be 0
-    public static int TrailingZeros(ulong value)
-    {
-        return DeBruijn[((value & (ulong)-(long)value) * 0x03F79D71B4CB0A89UL) >> 58];
     }
 }

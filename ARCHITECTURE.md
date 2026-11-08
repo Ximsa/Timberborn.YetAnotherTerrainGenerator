@@ -8,10 +8,9 @@ Core/                    Timberborn-independent: algorithms on plain arrays and 
   Common/                VoxelMap, MapVoxelReader, Surface, TileQueue
   Autoencoder/           AutoencoderGenerator, Mlp, LatentStats, GaussianBlur
   Noise3D/               Noise3DTerrainGenerator (+ settings), Noise3DOctaveNoise, Noise3DPerlinNoise
-  Wfc/                   WfcTerrainGenerator (+ settings, cell selection), WfcPatternSet, WfcSolver
+  Wfc/                   WfcTerrainGenerator (+ settings), WfcPatternShape, WfcPatternStore, WfcPatternIndex, WfcSolver
   Smoothing/             MedianBlur
   CliffSharpening/       CliffSharpener
-  Rivers/                RiverCarver
   Trees/                 TreePlacer (uses Noise3DOctaveNoise for patches)
 Game/                    Timberborn-specific: the map editor integration
   Common/                ModStarter, Configurator, MapEditorService, EntityPlacer, TerrainJobDialog,
@@ -56,7 +55,7 @@ TerrainJobDialog.RunJob ◀─────────────────�
   main thread:  commit pending undo entries
                 remove entities: all (generators) or only in changed columns (terrain tools)
                 MapEditorService.SetVoxelsByRow (through ITerrainService), spread over frames
-                placeEntities (optional): EntityPlacer spawns trees, bushes, water sources, over frames
+                placeEntities (optional): EntityPlacer spawns trees and bushes, over frames
                 commit undo entries: the whole action is one Ctrl+Z step
 ```
 
@@ -75,7 +74,7 @@ TerrainJobDialog.RunJob ◀─────────────────�
   feature, and the two bottom-bar groups.
 - `ToolGroupBottomBarButton` builds a native tool group from a `ToolGroups/*.blueprint.json` spec;
   `TerrainGeneratorGroupButton` (Autoencoder, Noise3D, Wfc) and `TerrainToolsGroupButton` (Smoothing, CliffSharpening,
-  Rivers, Trees) list their tools and icons.
+  Trees) list their tools and icons.
 - Assets: `Localizations/enUS.csv` (all texts), `Sprites/` (icons), `ToolGroups/` (group specs), `Models/`
   (autoencoder networks and latent statistics, read from `ModStarter.OriginPath/Models`).
 
@@ -85,10 +84,9 @@ TerrainJobDialog.RunJob ◀─────────────────�
 |---|---|---|
 | Autoencoder | `AutoencoderGenerator`: normalise input, encode (`Mlp`), sample around `LatentStats`, decode, enlarge, zoom, crop, `GaussianBlur`, normalise | `TerrainGeneratorDialog`: stages, heights to voxels |
 | Noise3D | `Noise3DTerrainGenerator`: octave noise density on a coarse grid, trilinear sampling into voxels, optional fit to map height | `Noise3DGeneratorDialog` |
-| Wfc | `WfcTerrainGenerator`: learn 3D patterns from maps (`WfcPatternSet`), solve with backtracking (`WfcSolver`, selectable cell order) | `WfcGeneratorDialog`: map checklist (`MapRepository`), cell selection dropdown |
+| Wfc | `WfcTerrainGenerator`: face-lookup WFC (docs/wfc-face-lookup.md): patterns of a set size from maps, deduplicated up to rotation (`WfcPatternShape`, `WfcPatternStore`), one face table per direction (`WfcPatternIndex`), smallest-domain placement with lookahead and neighbour-removal repair (`WfcSolver`) | `WfcGeneratorDialog`: map checklist (`MapRepository`), pattern size, height penalty; message box when no solution is found |
 | Smoothing | `MedianBlur` on the surface | `TerrainFilterDialog` |
 | CliffSharpening | `CliffSharpener`: watershed on slope, height bands, small-region merging, median plateaus, minimum cliff merging | `CliffSharpeningDialog` |
-| Rivers | `RiverCarver`: heads a few tiles below a climbed peak, steepest descent, basins filled up to a water volume, winding tunnels (3D) to the nearest edge or lower ground, beds at most one block deep | `RiverCarverDialog`: tunnels carved into the voxels, water sources at heads (`EntityPlacer`) |
 | Trees | `TreePlacer`: noise patches, species clumps, density near water | `TreePlacementDialog`: species from the game, water from `IThreadSafeWaterMap`, spawning (`EntityPlacer`) |
 
 ## Build and deploy

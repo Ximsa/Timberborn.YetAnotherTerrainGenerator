@@ -8,7 +8,8 @@ Ximsa.TerrainGenerator.Radius,"Radius of the Filter",-
 Ximsa.TerrainGenerator.Apply,"Apply",-
 Ximsa.TerrainGenerator.ZoomFactor,"Zoom Factor",-
 Ximsa.TerrainGenerator.Cancel,"Cancel",-
-Ximsa.TerrainGenerator.MaxHeight,"Maximum terrain height (when normalizing)",-
+Ximsa.TerrainGenerator.MaxHeight,"Maximum terrain height",-
+Ximsa.TerrainGenerator.MaxHeight.Tooltip,"Only used when normalizing.",-
 Ximsa.TerrainGenerator.SharpenTitle,"Sharpening Tool",-
 Ximsa.TerrainGenerator.SharpenStrength,"Sharpening Strength",-
 Ximsa.TerrainGenerator.SharpenSize,"Sharpening Kernel Range",-
@@ -29,61 +30,57 @@ Ximsa.TerrainGenerator.Progress.Starting,"Starting",-
 Ximsa.TerrainGenerator.Progress.Cancelled,"Cancelled - terrain unchanged",-
 Ximsa.TerrainGenerator.Tool.Noise3D,"3D Noise Generator",-
 Ximsa.TerrainGenerator.Tool.Noise3D.Description,"Generates terrain from 3D noise, with overhangs and floating islands. Hilliness and ruggedness shape the hills.",-
-Ximsa.TerrainGenerator.Noise3D.BaseLevel,"Base level (3D Noise height at the map bottom)",-
-Ximsa.TerrainGenerator.Noise3D.VerticalScale,"3D Noise blocks per tile (height)",-
-Ximsa.TerrainGenerator.Noise3D.HorizontalScale,"3D Noise blocks per tile (across)",-
+Ximsa.TerrainGenerator.Noise3D.BaseLevel,"Base level",-
+Ximsa.TerrainGenerator.Noise3D.BaseLevel.Tooltip,"3D noise height at the bottom of the map.",-
+Ximsa.TerrainGenerator.Noise3D.VerticalScale,"Vertical scale",-
+Ximsa.TerrainGenerator.Noise3D.VerticalScale.Tooltip,"3D noise blocks per tile, upwards.",-
+Ximsa.TerrainGenerator.Noise3D.HorizontalScale,"Horizontal scale",-
+Ximsa.TerrainGenerator.Noise3D.HorizontalScale.Tooltip,"3D noise blocks per tile, across.",-
 Ximsa.TerrainGenerator.Progress.Noise,"Computing 3D noise",-
 Ximsa.TerrainGenerator.Progress.Shaping,"Shaping terrain",-
 Ximsa.TerrainGenerator.Tool.Wfc,"WFC Generator",-
-Ximsa.TerrainGenerator.Tool.Wfc.Description,"Generates terrain in the style of other maps by wave function collapse over their terrain patterns.",-
+Ximsa.TerrainGenerator.Tool.Wfc.Description,"Generates terrain in the style of other maps by wave function collapse: tile patterns from those maps are fitted together face to face.",-
 Ximsa.TerrainGenerator.Wfc.Sources,"Learn from these maps",-
 Ximsa.TerrainGenerator.Wfc.CurrentMap,"Current map",-
 Ximsa.TerrainGenerator.Wfc.MoreMaps,"More maps",-
 Ximsa.TerrainGenerator.Wfc.BuiltInMaps,"Built-in maps",-
 Ximsa.TerrainGenerator.Wfc.UserMaps,"Your maps",-
-Ximsa.TerrainGenerator.Wfc.SolidThreshold,"Solid threshold (share of a block that makes it solid)",-
-Ximsa.TerrainGenerator.Wfc.BlockSize,"Block size (tiles per block and height step)",-
-Ximsa.TerrainGenerator.Wfc.PatternSize,"Pattern size (blocks)",-
-Ximsa.TerrainGenerator.Wfc.HeightPenalty,"Height penalty (likelihood per layer away from the source height)",-
-Ximsa.TerrainGenerator.Wfc.Coverage,"Pattern coverage (drops rare patterns)",-
+Ximsa.TerrainGenerator.Wfc.HeightPenalty,"Height penalty",-
+Ximsa.TerrainGenerator.Wfc.HeightPenalty.Tooltip,"How likely a pattern is for each cell layer away from the height where it was seen in the source maps. 1 ignores heights.",-
+Ximsa.TerrainGenerator.Wfc.PatternWidth,"Pattern width",-
+Ximsa.TerrainGenerator.Wfc.PatternWidth.Tooltip,"Tiles across. Wider patterns copy bigger pieces of the source maps but need more memory.",-
+Ximsa.TerrainGenerator.Wfc.PatternHeight,"Pattern height",-
+Ximsa.TerrainGenerator.Wfc.PatternHeight.Tooltip,"Tiles upwards.",-
+Ximsa.TerrainGenerator.Wfc.NoSolution,"WFC could not fit the patterns of the chosen maps together, even after 30 attempts. The map is unchanged. Try adding more maps, other maps or a smaller pattern size.",-
+Ximsa.TerrainGenerator.Wfc.MapsTooSmall,"None of the chosen maps is big enough for the pattern size. The map is unchanged.",-
 Ximsa.TerrainGenerator.Progress.ReadingMaps,"Reading maps",-
 Ximsa.TerrainGenerator.Progress.Learning,"Learning patterns",-
 Ximsa.TerrainGenerator.Progress.Solving,"Solving",-
 Ximsa.TerrainGenerator.Group.Tools,"Terrain Tools",-
 Ximsa.TerrainGenerator.Tool.CliffSharpening,"Cliff Sharpening",-
 Ximsa.TerrainGenerator.Tool.CliffSharpening.Description,"Splits the terrain into flat plateaus with cliffs between them, for easier building. Overhangs below the surface are kept.",-
-Ximsa.TerrainGenerator.CliffSharpening.RegionSize,"Region size (smoothing before splitting)",-
-Ximsa.TerrainGenerator.CliffSharpening.MinRegionArea,"Smallest plateau (tiles)",-
+Ximsa.TerrainGenerator.CliffSharpening.RegionSize,"Region size",-
+Ximsa.TerrainGenerator.CliffSharpening.RegionSize.Tooltip,"Smoothing before the terrain is split into plateaus.",-
+Ximsa.TerrainGenerator.CliffSharpening.MinRegionArea,"Smallest plateau",-
+Ximsa.TerrainGenerator.CliffSharpening.MinRegionArea.Tooltip,"In tiles.",-
 Ximsa.TerrainGenerator.CliffSharpening.StepSize,"Smallest cliff height between plateaus",-
 Ximsa.TerrainGenerator.CliffSharpening.Strength,"Strength",-
 Ximsa.TerrainGenerator.Progress.Sharpening,"Sharpening cliffs",-
-Ximsa.TerrainGenerator.Variety,"Variety (in spreads of the built-in maps)",-
+Ximsa.TerrainGenerator.Variety,"Variety",-
+Ximsa.TerrainGenerator.Variety.Tooltip,"In spreads of the built-in maps.",-
 Ximsa.TerrainGenerator.Progress.Placing,"Placing",-
-Ximsa.TerrainGenerator.Tool.RiverCarver,"River Carver",-
-Ximsa.TerrainGenerator.Tool.RiverCarver.Description,"Carves rivers that start a few tiles below a hilltop, fill the basins on their way up to a set volume and run downhill to the map edge, tunnelling out of full basins. A water source is placed at each head. River beds lower the terrain by at most one block.",-
-Ximsa.TerrainGenerator.RiverCarver.Rivers,"Number of rivers",-
-Ximsa.TerrainGenerator.RiverCarver.Width,"River width (tiles)",-
-Ximsa.TerrainGenerator.RiverCarver.MaxBasinVolume,"Largest basin volume (voxels of water) before tunnelling out",-
-Ximsa.TerrainGenerator.RiverCarver.FillDipArea,"Fill dips on the river's path smaller than (tiles)",-
-Ximsa.TerrainGenerator.RiverCarver.HeadDistance,"River head: tiles before the peak",-
-Ximsa.TerrainGenerator.RiverCarver.SourceStrength,"Water source strength",-
-Ximsa.TerrainGenerator.Progress.Carving,"Carving rivers",-
 Ximsa.TerrainGenerator.Tool.TreePlacement,"Tree Placement",-
 Ximsa.TerrainGenerator.Tool.TreePlacement.Description,"Replaces all trees and bushes with forests and bush patches, denser near water and kept off cliff edges.",-
 Ximsa.TerrainGenerator.TreePlacement.ForestCoverage,"Forest coverage",-
 Ximsa.TerrainGenerator.TreePlacement.BushCoverage,"Bush coverage",-
-Ximsa.TerrainGenerator.TreePlacement.PatchSize,"Patch size (tiles)",-
+Ximsa.TerrainGenerator.TreePlacement.PatchSize,"Patch size",-
+Ximsa.TerrainGenerator.TreePlacement.PatchSize.Tooltip,"In tiles.",-
 Ximsa.TerrainGenerator.TreePlacement.Density,"Density inside patches",-
 Ximsa.TerrainGenerator.TreePlacement.TreeSpecies,"Tree species",-
 Ximsa.TerrainGenerator.TreePlacement.BushSpecies,"Bush species",-
 Ximsa.TerrainGenerator.Progress.ChoosingPlants,"Choosing places for plants",-
-Ximsa.TerrainGenerator.Noise3D.Ruggedness,"Ruggedness (rounded .. rugged peaks)",-
-Ximsa.TerrainGenerator.Noise3D.Hilliness,"Hilliness (flat .. hilly)",-
-Ximsa.TerrainGenerator.Wfc.CellSelection,"Next cell to collapse",-
-Ximsa.TerrainGenerator.Wfc.CellSelection.LowestEntropy,"Lowest entropy",-
-Ximsa.TerrainGenerator.Wfc.CellSelection.FewestPatterns,"Fewest patterns",-
-Ximsa.TerrainGenerator.Wfc.CellSelection.LayerByLayer,"Layer by layer (ground first)",-
-Ximsa.TerrainGenerator.Wfc.CellSelection.Scanline,"Scanline (fixed order)",-
-Ximsa.TerrainGenerator.Wfc.CellSelection.CentreOutward,"Centre outward",-
-Ximsa.TerrainGenerator.Wfc.CellSelection.RandomOrder,"Random order",-
+Ximsa.TerrainGenerator.Noise3D.Ruggedness,"Ruggedness",-
+Ximsa.TerrainGenerator.Noise3D.Ruggedness.Tooltip,"From rounded hills to rugged peaks.",-
+Ximsa.TerrainGenerator.Noise3D.Hilliness,"Hilliness",-
+Ximsa.TerrainGenerator.Noise3D.Hilliness.Tooltip,"From flat to hilly.",-
 Ximsa.TerrainGenerator.Normalize,"Normalize: stretch the terrain to fill the map's height",-

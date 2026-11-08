@@ -23,16 +23,16 @@ public class CliffSharpeningDialog : TerrainJobDialog
     public CliffSharpeningDialog(ILoc loc, MapEditorService mapEditorService) : base(loc, mapEditorService)
     {
         SetTitle(loc.T(TitleKey));
-        Content.Add(new GameSliderInt()
+        Content.Add(WithTooltip(RegionSizeKey, new GameSliderInt()
             .SetLabel(loc.T(RegionSizeKey))
             .SetHorizontalSlider(new SliderValues<int>(2, 8, settings.RegionSize))
             .RegisterChange(regionSize => settings.RegionSize = regionSize)
-            .AddEndLabel(value => $"{value}"));
-        Content.Add(new GameSliderInt()
+            .AddEndLabel(value => $"{value}")));
+        Content.Add(WithTooltip(MinRegionAreaKey, new GameSliderInt()
             .SetLabel(loc.T(MinRegionAreaKey))
             .SetHorizontalSlider(new SliderValues<int>(16, 128, settings.MinRegionArea))
             .RegisterChange(minRegionArea => settings.MinRegionArea = minRegionArea)
-            .AddEndLabel(value => $"{value}"));
+            .AddEndLabel(value => $"{value}")));
         Content.Add(new GameSliderInt()
             .SetLabel(loc.T(StepSizeKey))
             .SetHorizontalSlider(new SliderValues<int>(1, 6, settings.StepSize))

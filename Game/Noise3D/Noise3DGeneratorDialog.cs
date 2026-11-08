@@ -25,34 +25,34 @@ public class Noise3DGeneratorDialog : TerrainJobDialog
     public Noise3DGeneratorDialog(ILoc loc, MapEditorService mapEditorService) : base(loc, mapEditorService)
     {
         SetTitle(loc.T(TitleKey));
-        Content.Add(new GameSlider()
+        Content.Add(WithTooltip(HillinessKey, new GameSlider()
             .SetLabel(loc.T(HillinessKey))
             .SetHorizontalSlider(new SliderValues<float>(0, 1, (float)settings.Hilliness))
             .RegisterChange(hilliness => settings.Hilliness = hilliness)
-            .AddEndLabel(value => $"{value:F2}"));
-        Content.Add(new GameSlider()
+            .AddEndLabel(value => $"{value:F2}")));
+        Content.Add(WithTooltip(RuggednessKey, new GameSlider()
             .SetLabel(loc.T(RuggednessKey))
             .SetHorizontalSlider(new SliderValues<float>(0, 1, (float)settings.Ruggedness))
             .RegisterChange(ruggedness => settings.Ruggedness = ruggedness)
-            .AddEndLabel(value => $"{value:F2}"));
+            .AddEndLabel(value => $"{value:F2}")));
         Content.AddGamePanelToggle(loc.T(NormalizeKey), normalize => settings.Normalize = normalize)
             .SetValueWithoutNotify(settings.Normalize);
-        Content.Add(new GameSlider()
+        Content.Add(WithTooltip(BaseLevelKey, new GameSlider()
             .SetLabel(loc.T(BaseLevelKey))
             .SetHorizontalSlider(new SliderValues<float>(32, 80, (float)settings.BaseLevel))
             .RegisterChange(baseLevel => settings.BaseLevel = baseLevel)
-            .AddEndLabel(value => $"{value:F0}"));
-        Content.Add(new GameSlider()
+            .AddEndLabel(value => $"{value:F0}")));
+        Content.Add(WithTooltip(VerticalScaleKey, new GameSlider()
             .SetLabel(loc.T(VerticalScaleKey))
             .SetHorizontalSlider(new SliderValues<float>(1, 6, (float)settings.VerticalScale))
             .RegisterChange(verticalScale => settings.VerticalScale = verticalScale)
-            .AddEndLabel(value => $"{value:F2}"));
+            .AddEndLabel(value => $"{value:F2}")));
         settings.HorizontalScale = settings.VerticalScale;
-        Content.Add(new GameSlider()
+        Content.Add(WithTooltip(HorizontalScaleKey, new GameSlider()
             .SetLabel(loc.T(HorizontalScaleKey))
             .SetHorizontalSlider(new SliderValues<float>(1, 6, (float)settings.HorizontalScale))
             .RegisterChange(horizontalScale => settings.HorizontalScale = horizontalScale)
-            .AddEndLabel(value => $"{value:F2}"));
+            .AddEndLabel(value => $"{value:F2}")));
         generateButton = Content.AddButton(loc.T(GenerateKey), GenerateKey, OnGenerate);
         AddProgressBar();
         AddCloseButton();

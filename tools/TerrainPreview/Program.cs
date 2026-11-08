@@ -2,24 +2,21 @@ using System.Diagnostics;
 using Timberborn.TerrainGenerator.Core.CliffSharpening;
 using Timberborn.TerrainGenerator.Core.Common;
 using Timberborn.TerrainGenerator.Core.Noise3D;
-using Timberborn.TerrainGenerator.Core.Rivers;
 using Timberborn.TerrainGenerator.Core.Trees;
 using Timberborn.TerrainGenerator.Core.Wfc;
 using TerrainPreview;
 
 // Usage:
 //   TerrainPreview noise3d --size 128x128x23 --seed 1 [--hilliness 1] [--ruggedness 0.5] [--normalize false] [--base 56] [--vscale 3]
-//       [--hscale 3] [--rivers 1] [--river-seed 1] --out preview.png   (--rivers works after any map-producing command)
-//   TerrainPreview wfc --sources a.timber,b.timber --size 64x64x23 --seed 1 [--n 3] [--symmetry true]
-//       [--periodic false] [--penalty 0.5] [--threshold 0.25] [--coverage 0.95] [--block 4] [--seeds 1-10]
-//       [--select lowestentropy|fewestpatterns|layerbylayer|scanline|centreoutward|randomorder] --out preview.png
-//   TerrainPreview threshold-sweep --sources a.timber,b.timber [--size 128x128x23] [--seed 1] [--start 0] --out-dir <dir>
+//       [--hscale 3] --out preview.png
+//   TerrainPreview wfc --sources a.timber,b.timber|<folder> [--size 128x128x16] [--seed 1] [--seeds 1-8]
+//       [--deletions 2000] [--attempts 10] [--lookahead true] [--clear-every 8] [--penalty 0.25] --out preview.png
+//   TerrainPreview wfc-test --sources a.timber   (checks the pattern encoding)
+//   (wfc: --width 6 --height 4 set the pattern size)
 //   TerrainPreview map <file.timber> --out preview.png
 //   TerrainPreview sharpen <file.timber> [--region 4] [--min-area 32] [--step 2] [--strength 0.5] --out preview.png
-//   TerrainPreview rivers <file.timber> [--rivers 3] [--width 3] [--head 4] [--basin 500] [--fill 64] [--seed 1] [--sharpen false]
-//       --out preview.png
-//   TerrainPreview trees <file.timber> [--rivers 0] [--forest 0.35] [--bush 0.12] [--patch 32] [--clump 6]
-//       [--density 0.5] [--seed 1] [--sharpen false] --out preview.png
+//   TerrainPreview trees <file.timber> [--forest 0.2] [--bush 0.12] [--patch 32] [--clump 6]
+//       [--density 0.35] [--seed 1] [--sharpen false] --out preview.png
 if (args.Length == 0)
 {
     Console.WriteLine("usage: TerrainPreview noise3d|map ... --out <file.png>");
@@ -56,99 +53,167 @@ switch (args[0])
     }
     case "wfc":
     {
-        var size = ParseSize(options.GetValueOrDefault("size", "64x64x23"));
+        var size = ParseSize(options.GetValueOrDefault("size", "128x128x16"));
         var settings = new WfcSettings
         {
             Seed = int.Parse(options.GetValueOrDefault("seed", "1")),
-            PatternSize = int.Parse(options.GetValueOrDefault("n", "3")),
-            Symmetry = options.GetValueOrDefault("symmetry", "true") == "true",
-            PeriodicInput = options.GetValueOrDefault("periodic", "false") == "true",
-            HeightPenalty = double.Parse(options.GetValueOrDefault("penalty", "0.5"), System.Globalization.CultureInfo.InvariantCulture),
-            SolidThreshold = double.Parse(options.GetValueOrDefault("threshold", "0.25"), System.Globalization.CultureInfo.InvariantCulture),
-            PatternCoverage = double.Parse(options.GetValueOrDefault("coverage", "0.95"), System.Globalization.CultureInfo.InvariantCulture),
-            BlockSize = int.Parse(options.GetValueOrDefault("block", "4")),
-            CellSelection = Enum.Parse<WfcCellSelection>(options.GetValueOrDefault("select", "LowestEntropy"), true)
+            MaxDeletions = int.Parse(options.GetValueOrDefault("deletions", "2000")),
+            MaxAttempts = int.Parse(options.GetValueOrDefault("attempts", "10")),
+            Lookahead = options.GetValueOrDefault("lookahead", "true") == "true",
+            PatternWidth = int.Parse(options.GetValueOrDefault("width", "6")),
+            PatternHeight = int.Parse(options.GetValueOrDefault("height", "4")),
+            ClearEvery = int.Parse(options.GetValueOrDefault("clear-every", "8")),
+            HeightPenalty = double.Parse(options.GetValueOrDefault("penalty", "0.25"), System.Globalization.CultureInfo.InvariantCulture)
         };
-        var sources = options["sources"].Split(',').Select(path =>
-        {
-            using var file = File.OpenRead(path);
-            return MapVoxelReader.Read(file);
-        }).ToList();
+        var sources = ReadSources(options["sources"]);
         var generator = new WfcTerrainGenerator(settings);
         generator.Learn(sources);
-        Console.WriteLine($"learned {generator.PatternCount} patterns in {stopwatch.ElapsedMilliseconds} ms");
-        if (options.TryGetValue("seeds", out var seedRange))
+        Console.WriteLine($"learned from {sources.Count} maps in {stopwatch.ElapsedMilliseconds} ms");
+        Console.WriteLine(generator.Index.Describe());
+        var seeds = options.TryGetValue("seeds", out var seedRange)
+            ? seedRange.Split('-').Select(int.Parse).ToArray()
+            : new[] { settings.Seed };
+        var tiles = new List<(string Label, Image Tile)>();
+        var profiles = new List<double[]>();
+        VoxelMap? generated = null;
+        for (var seed = seeds[0]; seed <= seeds[^1]; seed++)
         {
-            // one contact sheet with a tile per seed, learning only once
-            var bounds = seedRange.Split('-').Select(int.Parse).ToArray();
-            var tiles = new List<(string Label, Image Tile)>();
-            for (var seed = bounds[0]; seed <= bounds[^1]; seed++)
+            var run = Stopwatch.StartNew();
+            settings.Seed = seed;
+            try
             {
-                var run = Stopwatch.StartNew();
-                settings.Seed = seed;
-                var backtracksBefore = generator.Backtracks;
-                var result = generator.Generate(size.X, size.Y, size.Z);
-                Console.Write($"seed {seed,2}: {run.ElapsedMilliseconds,6} ms, {generator.AttemptsUsed} attempt(s), " +
-                              $"{generator.Backtracks - backtracksBefore} backtracks | ");
-                PrintStats(result);
-                tiles.Add((seed.ToString(), VoxelRenderer.RenderIsometric(result)));
+                generated = generator.Generate(size.X, size.Y, size.Z);
+            }
+            catch (GenerationFailedException exception)
+            {
+                Console.WriteLine($"seed {seed}: {exception.Message}");
+                tiles.Add(($"{seed} failed", new Image(64, 64, new Rgb(90, 30, 30))));
+                continue;
             }
 
+            Console.WriteLine($"seed {seed}: {run.ElapsedMilliseconds} ms, {generator.Attempts.Count} attempt(s), " +
+                              $"novelty {generator.Novelty(generated) * 100:F1}%");
+            foreach (var attempt in generator.Attempts)
+                Console.WriteLine($"  {attempt}");
+            Console.Write("  ");
+            PrintStats(generated);
+            profiles.Add(WfcTerrainGenerator.FillProfile(generated));
+            tiles.Add((seed.ToString(), VoxelRenderer.RenderIsometric(generated)));
+        }
+
+        // fill ratio per height: the generated maps' mean against the sources
+        Console.WriteLine("height  sources  generated");
+        for (var z = 0; z < size.Z; z++)
+            Console.WriteLine($"{z,6}  {(z < generator.SourceProfile.Length ? generator.SourceProfile[z] : 0),7:P0}  " +
+                              $"{(profiles.Count > 0 ? profiles.Average(p => p[z]) : 0),9:P0}");
+        if (seeds.Length > 1)
+        {
             Sheet(tiles).SavePng(output);
             Console.WriteLine($"wrote {output} after {stopwatch.ElapsedMilliseconds} ms");
             return 0;
         }
 
-        map = generator.Generate(size.X, size.Y, size.Z);
-        Console.WriteLine($"generated in {stopwatch.ElapsedMilliseconds} ms after {generator.AttemptsUsed} attempt(s), {generator.Backtracks} backtracks");
+        if (generated == null)
+            return 1;
+        map = generated;
         break;
     }
-    case "threshold-sweep":
+    case "wfc-test":
     {
-        // the coarse round trip of the first source, and WFC results, for solid thresholds 0% .. 100%
-        var size = ParseSize(options.GetValueOrDefault("size", "128x128x23"));
-        var seed = int.Parse(options.GetValueOrDefault("seed", "1"));
-        var outDir = options.GetValueOrDefault("out-dir", ".");
-        var sources = options["sources"].Split(',').Select(path =>
+        // checks of the pattern encoding for several shapes (docs/wfc-face-lookup.md, section 9 step 1)
+        var failures = 0;
+        var random = new Random(1);
+        var source = ReadSources(options["sources"])[0];
+        foreach (var (width, height) in new[] { (4, 4), (6, 4), (8, 5), (9, 6), (10, 6) })
         {
-            using var file = File.OpenRead(path);
-            return MapVoxelReader.Read(file);
-        }).ToList();
-        var roundTrips = new List<(string Label, Image Tile)>();
-        var results = new List<(string Label, Image Tile)>();
-        var startPercent = int.Parse(options.GetValueOrDefault("start", "0"));
-        for (var percent = startPercent; percent <= 100; percent += 10)
-        {
-            var threshold = percent / 100.0;
-            var label = $"{percent}%";
-            var first = sources[0];
-            var roundTrip = WfcTerrainGenerator.Upsample(WfcTerrainGenerator.Downsample(first, threshold),
-                first.SizeX, first.SizeY, first.SizeZ);
-            roundTrips.Add((label, VoxelRenderer.RenderIsometric(roundTrip)));
-            Console.Write($"{label,4}: round trip solid {roundTrip.CountSolid(),6} (source {first.CountSolid()}) | ");
+            var shape = new WfcPatternShape(width, height);
+            for (var i = 0; i < 1000; i++)
+            {
+                var code = shape.NewPattern();
+                for (var z = 0; z < height; z++)
+                for (var y = 0; y < width; y++)
+                for (var x = 0; x < width; x++)
+                    if (random.Next(2) == 1)
+                        shape.SetVoxel(code, x, y, z);
+                var turned = (ulong[])code.Clone();
+                shape.Rotate(turned, 4);
+                if (!turned.SequenceEqual(code))
+                    failures += Fail($"{shape}: four turns changed a pattern");
+                var canonical = Canonical(shape, code);
+                shape.Rotate(turned);
+                if (!Canonical(shape, turned).SequenceEqual(canonical))
+                    failures += Fail($"{shape}: canonical form differs between rotations");
+                // a turn maps (x, y, z) to (w - 1 - y, x, z), so the turned +x face is the original -y face
+                for (var z = 0; z < height; z++)
+                for (var x = 0; x < width; x++)
+                    if (shape.Voxel(turned, width - 1, x, z) != shape.Voxel(code, x, 0, z))
+                        failures += Fail($"{shape}: a turn moved voxel ({x}, 0, {z}) wrongly");
+            }
 
-            var run = Stopwatch.StartNew();
-            var generator = new WfcTerrainGenerator(new WfcSettings { Seed = seed, SolidThreshold = threshold });
-            try
+            // windows one stride apart in a source share their face exactly, also after turning both
+            int[] turnedDirection = { 2, 3, 1, 0, 4, 5 };
+            for (var i = 0; i < 1000; i++)
             {
-                generator.Learn(sources);
-                var result = generator.Generate(size.X, size.Y, size.Z);
-                results.Add((label, VoxelRenderer.RenderIsometric(result)));
-                Console.Write($"WFC {generator.PatternCount,5} patterns, {run.ElapsedMilliseconds / 1000.0,5:F1} s, " +
-                              $"{generator.Backtracks} backtracks | ");
-                PrintStats(result);
+                int x = random.Next(source.SizeX - 2 * width), y = random.Next(source.SizeY - 2 * width),
+                    z = random.Next(source.SizeZ - 2 * height);
+                var a = Window(shape, source, x, y, z);
+                for (var d = 0; d < 6; d += 2)
+                {
+                    var (dx, dy, dz) = WfcPatternShape.Directions[d];
+                    var b = Window(shape, source, x + shape.StrideAcross * dx, y + shape.StrideAcross * dy,
+                        z + shape.StrideUp * dz);
+                    if (shape.Face(a, d) != shape.Face(b, d + 1))
+                        failures += Fail($"{shape}: faces differ at ({x}, {y}, {z}) direction {d}");
+                    var t = turnedDirection[d];
+                    var turnedA = (ulong[])a.Clone();
+                    var turnedB = (ulong[])b.Clone();
+                    shape.Rotate(turnedA);
+                    shape.Rotate(turnedB);
+                    if (shape.Face(turnedA, t) != shape.Face(turnedB, t ^ 1))
+                        failures += Fail($"{shape}: turned faces differ at ({x}, {y}, {z}) direction {d}");
+                }
             }
-            catch (Exception exception)
+
+            // the sliding-window extraction gives the same canonical patterns as reading windows one by one
+            var expected = new List<ulong[]>();
+            for (var z = 0; z + height <= Math.Min(source.SizeZ, height + 1); z++)
+            for (var y = 0; y + width <= source.SizeY; y++)
+            for (var x = 0; x + width <= source.SizeX; x++)
+                expected.Add(Canonical(shape, Window(shape, source, x, y, z)));
+            var seen = 0;
+            WfcPatternIndex.ForEachWindow(shape, source, (_, canonical) =>
             {
-                results.Add((label, new Image(64, 64, new Rgb(90, 30, 30))));
-                Console.WriteLine($"WFC failed: {exception.Message}");
-            }
+                if (seen < expected.Count && !canonical.SequenceEqual(expected[seen++]))
+                    failures += Fail($"{shape}: window {seen - 1} differs from the sliding extraction");
+            });
         }
 
-        Sheet(roundTrips).SavePng(Path.Combine(outDir, "threshold-roundtrip.png"));
-        Sheet(results).SavePng(Path.Combine(outDir, "threshold-wfc.png"));
-        Console.WriteLine($"wrote sheets to {outDir} after {stopwatch.ElapsedMilliseconds / 1000} s");
-        return 0;
+        Console.WriteLine(failures == 0 ? "all checks passed" : $"{failures} checks failed");
+        return failures == 0 ? 0 : 1;
+
+        static int Fail(string message)
+        {
+            Console.WriteLine(message);
+            return 1;
+        }
+
+        static ulong[] Canonical(WfcPatternShape shape, ulong[] pattern)
+        {
+            var result = (ulong[])pattern.Clone();
+            shape.Canonicalize(result, shape.NewPattern());
+            return result;
+        }
+
+        static ulong[] Window(WfcPatternShape shape, VoxelMap map, int x, int y, int z)
+        {
+            var pattern = shape.NewPattern();
+            for (var dz = 0; dz < shape.Height; dz++)
+            for (var dy = 0; dy < shape.Width; dy++)
+            for (var dx = 0; dx < shape.Width; dx++)
+                if (map[x + dx, y + dy, z + dz])
+                    shape.SetVoxel(pattern, dx, dy, dz);
+            return pattern;
+        }
     }
     case "map":
     {
@@ -180,70 +245,42 @@ switch (args[0])
         Console.WriteLine($"wrote {output}");
         return 0;
     }
-    case "rivers":
     case "trees":
     {
-        // optional sharpening, then rivers (blue, heads red), then for "trees" the plants (dark green trees in
-        // shades per species, yellow-green bushes)
+        // optional sharpening, then the plants (dark green trees in shades per species, yellow-green bushes); map
+        // files are read without their water, so no tile counts as water
         using var file = File.OpenRead(args[1]);
         var before = MapVoxelReader.Read(file);
         var heights = Surface.Heights(before);
         if (options.GetValueOrDefault("sharpen", "false") == "true")
             heights = new CliffSharpener(new CliffSharpenerSettings(), before.SizeX, before.SizeY).Sharpen(heights);
-        var seed = int.Parse(options.GetValueOrDefault("seed", "1"));
-        var riverSettings = new RiverCarverSettings
+        var defaults = new TreePlacerSettings();
+        var treeSettings = new TreePlacerSettings
         {
-            Rivers = int.Parse(options.GetValueOrDefault("rivers", args[0] == "rivers" ? "3" : "0")),
-            Width = int.Parse(options.GetValueOrDefault("width", "3")),
-            HeadDistance = int.Parse(options.GetValueOrDefault("head", "4")),
-            MaxBasinVolume = int.Parse(options.GetValueOrDefault("basin", "500")),
-            FillDipArea = int.Parse(options.GetValueOrDefault("fill", "64")),
-            Seed = seed
+            ForestCoverage = Double("forest", defaults.ForestCoverage),
+            BushCoverage = Double("bush", defaults.BushCoverage),
+            PatchSize = int.Parse(options.GetValueOrDefault("patch", defaults.PatchSize.ToString())),
+            ClumpSize = int.Parse(options.GetValueOrDefault("clump", defaults.ClumpSize.ToString())),
+            Density = Double("density", defaults.Density),
+            // stand-ins for the game's species: four trees and two bushes
+            TreeWeights = new[] { 1.0, 1.0, 1.0, 0.5 },
+            BushWeights = new[] { 1.0, 1.0 },
+            Seed = int.Parse(options.GetValueOrDefault("seed", "1"))
         };
-        var carver = new RiverCarver(riverSettings, before.SizeX, before.SizeY);
-        heights = carver.Carve(heights);
-        Console.WriteLine($"carved {carver.Heads.Count} rivers ({carver.Water.Count(w => w)} water tiles, " +
-                          $"{carver.Tunnels.Count} tunnel columns) in " +
-                          $"{stopwatch.ElapsedMilliseconds} ms; heads at " +
-                          string.Join(", ", carver.Heads.Select(h => $"({h.X}, {h.Y}, z {h.Z})")));
-        var after = Surface.WithHeights(before, heights);
-        carver.CarveTunnels(after);
+        var placer = new TreePlacer(treeSettings, before.SizeX, before.SizeY);
+        var plants = placer.Place(heights, new bool[heights.Length]);
+        var trees = plants.Count(p => p.Kind == PlantKind.Tree);
+        var bushes = plants.Count(p => p.Kind == PlantKind.Bush);
+        Console.WriteLine($"placed {trees} trees ({trees * 100.0 / heights.Length:F1}% of tiles) and {bushes} bushes " +
+                          $"({bushes * 100.0 / heights.Length:F1}%) in {stopwatch.ElapsedMilliseconds} ms");
         var colors = new Dictionary<(int, int), Rgb>();
-        for (var i = 0; i < carver.Water.Length; i++)
-            if (carver.Water[i])
-                colors[(i % before.SizeX, i / before.SizeX)] = new Rgb(60, 120, 220);
-        foreach (var (x, y, _) in carver.Tunnels)
-            colors[(x, y)] = new Rgb(150, 60, 200);
-        if (args[0] == "trees")
-        {
-            var treeSettings = new TreePlacerSettings
-            {
-                ForestCoverage = Double("forest", "0.35"),
-                BushCoverage = Double("bush", "0.12"),
-                PatchSize = int.Parse(options.GetValueOrDefault("patch", "32")),
-                ClumpSize = int.Parse(options.GetValueOrDefault("clump", "6")),
-                Density = Double("density", "0.5"),
-                // stand-ins for the game's species: four trees and two bushes
-                TreeWeights = new[] { 1.0, 1.0, 1.0, 0.5 },
-                BushWeights = new[] { 1.0, 1.0 },
-                Seed = seed
-            };
-            var placer = new TreePlacer(treeSettings, before.SizeX, before.SizeY);
-            var run = Stopwatch.StartNew();
-            var plants = placer.Place(heights, carver.Water);
-            Console.WriteLine($"placed {plants.Count(p => p.Kind == PlantKind.Tree)} trees and " +
-                              $"{plants.Count(p => p.Kind == PlantKind.Bush)} bushes in {run.ElapsedMilliseconds} ms");
-            Rgb[] treeColors = { new(20, 70, 30), new(40, 95, 35), new(15, 55, 60), new(80, 60, 30) };
-            Rgb[] bushColors = { new(180, 200, 60), new(220, 120, 160) };
-            foreach (var plant in plants)
-                colors[(plant.X, plant.Y)] = plant.Kind == PlantKind.Tree
-                    ? treeColors[plant.Species]
-                    : bushColors[plant.Species];
-        }
-
-        foreach (var head in carver.Heads)
-            colors[(head.X, head.Y)] = new Rgb(230, 40, 40);
-        PrintStats(after);
+        Rgb[] treeColors = { new(20, 70, 30), new(40, 95, 35), new(15, 55, 60), new(80, 60, 30) };
+        Rgb[] bushColors = { new(180, 200, 60), new(220, 120, 160) };
+        foreach (var plant in plants)
+            colors[(plant.X, plant.Y)] = plant.Kind == PlantKind.Tree
+                ? treeColors[plant.Species]
+                : bushColors[plant.Species];
+        var after = Surface.WithHeights(before, heights);
         Sheet(new List<(string, Image)>
         {
             ("before", VoxelRenderer.Render(before)),
@@ -252,9 +289,11 @@ switch (args[0])
         Console.WriteLine($"wrote {output}");
         return 0;
 
-        double Double(string key, string fallback)
+        double Double(string key, double fallback)
         {
-            return double.Parse(options.GetValueOrDefault(key, fallback), System.Globalization.CultureInfo.InvariantCulture);
+            return options.TryGetValue(key, out var value)
+                ? double.Parse(value, System.Globalization.CultureInfo.InvariantCulture)
+                : fallback;
         }
     }
     default:
@@ -262,32 +301,8 @@ switch (args[0])
         return 1;
 }
 
-Func<int, int, Rgb?>? overlay = null;
-if (options.TryGetValue("rivers", out var riverCount))
-{
-    // carve rivers into the generated map: water blue, heads red
-    var carver = new RiverCarver(new RiverCarverSettings
-    {
-        Rivers = int.Parse(riverCount),
-        Seed = int.Parse(options.GetValueOrDefault("river-seed", options.GetValueOrDefault("seed", "1")))
-    }, map.SizeX, map.SizeY);
-    map = Surface.WithHeights(map, carver.Carve(Surface.Heights(map)));
-    carver.CarveTunnels(map);
-    Console.WriteLine($"carved {carver.Heads.Count} river(s), {carver.Water.Count(w => w)} water tiles, " +
-                      $"{carver.Tunnels.Count} tunnel columns, heads at " +
-                      string.Join(", ", carver.Heads.Select(h => $"({h.X}, {h.Y}, z {h.Z})")));
-    var heads = carver.Heads.Select(h => (h.X, h.Y)).ToHashSet();
-    var tunnels = carver.Tunnels.Select(t => (t.X, t.Y)).ToHashSet();
-    var water = carver.Water;
-    var width = map.SizeX;
-    // heads red, tunnels purple, open water blue
-    overlay = (x, y) => heads.Contains((x, y)) ? new Rgb(230, 40, 40)
-        : tunnels.Contains((x, y)) ? new Rgb(150, 60, 200)
-        : water[y * width + x] ? new Rgb(60, 120, 220) : null;
-}
-
 PrintStats(map);
-VoxelRenderer.Render(map, overlay).SavePng(output);
+VoxelRenderer.Render(map).SavePng(output);
 Console.WriteLine($"wrote {output} after {stopwatch.ElapsedMilliseconds} ms");
 return 0;
 
@@ -305,6 +320,20 @@ static Dictionary<string, string> ParseOptions(IEnumerable<string> arguments)
         }
 
     return result;
+}
+
+// comma-separated .timber files or folders of them
+static List<VoxelMap> ReadSources(string paths)
+{
+    return paths.Split(',')
+        .SelectMany(path => Directory.Exists(path)
+            ? Directory.GetFiles(path, "*.timber").OrderBy(file => file).ToArray()
+            : new[] { path })
+        .Select(path =>
+        {
+            using var file = File.OpenRead(path);
+            return MapVoxelReader.Read(file);
+        }).ToList();
 }
 
 static (int X, int Y, int Z) ParseSize(string size)
