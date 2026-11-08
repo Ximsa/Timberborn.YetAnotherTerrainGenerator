@@ -16,6 +16,7 @@ Replaces the coarse-block overlapping WFC (see `terrain-generators-plan.md`, Pha
 | 7 Multi-level tables (§12) | Not started; candidate lookup is not the bottleneck at 128 x 128 |
 | 8 Cell selection order (§13) | Not started |
 | Pattern size setting | Done: width 4-10 across, height 4-6 up in the dialog, 7 x 7 x 5 by default (2026-11-08; Diorama alone solves in 1-10 attempts, at most 3 s, Plains alone in 1); `wfc-test` checks 4x4x4, 6x6x4, 8x8x5, 9x9x6, 10x10x6 |
+| Parallel learning | Done (2026-11-08), see measurements; not yet tested in game |
 | In game | 4 x 4 x 4 tested with 10 maps (solved, 3.6 s); one small map alone failed and raised the game's error report, now a message box instead. Pattern size sliders and the message box not yet tested in game |
 
 ## Decisions and deviations from the spec
@@ -57,6 +58,10 @@ Replaces the coarse-block overlapping WFC (see `terrain-generators-plan.md`, Pha
   8x8x5: 2.7 M patterns, learning 80 s, peak 2.0 GB, solves 4.6-13 s. Large sizes are meant for few source maps:
   10x10x6 from Diorama + Cliffside learns in 0.8 s (36k patterns, 11 MB) and solved on the 8th attempt, about 7 s.
   Selecting many maps with large patterns is a user error (memory), not guarded.
+- Parallel learning (2026-11-08, all cores but one, `Core/Common/Parallelism`): the heights of each map are scanned
+  into their own stores and merged in height order (pattern ids and maps unchanged); face tables are built one thread
+  per direction, neighbour links in parallel over patterns; side faces are read with bit shifts. All 22 maps:
+  6x6x4 learning 15.7 s -> 5.6 s (same maps per seed); 7x7x5 32.5 s -> 9.1 s, peak 858 MB.
 
 ---
 

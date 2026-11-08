@@ -17,8 +17,8 @@ public sealed class WfcPatternIndex
     private readonly int[] bandCounts;
 
     // per direction: face slots .. slot + 1 give the range of ids[direction] with that face on that side
-    private readonly int[][] offsets;
-    private readonly int[][] ids;
+    private readonly int[][] offsets = new int[6][];
+    private readonly int[][] ids = new int[6][];
 
     // [oriented id * 6 + direction]: the face slot in table direction ^ 1 that matches the id's face on side
     // direction, so the candidates of the neighbour in that direction; -1 if no pattern has a matching face
@@ -26,7 +26,9 @@ public sealed class WfcPatternIndex
 
     private readonly int[] faceValues = new int[6];
 
-    private WfcPatternIndex(WfcPatternShape shape, WfcPatternStore store, int[] bandCounts, int bands, long windows)
+    // the steps run on several threads; progress is reported between them, from the calling thread
+    private WfcPatternIndex(WfcPatternShape shape, WfcPatternStore store, int[] bandCounts, int bands, long windows,
+        Action<float> progress)
     {
         Shape = shape;
         this.store = store;
@@ -35,34 +37,38 @@ public sealed class WfcPatternIndex
         Windows = windows;
         var patterns = store.Count;
         Rotations = new byte[patterns];
-        var oriented = new List<int>();
-        var pattern = shape.NewPattern();
-        for (var p = 0; p < patterns; p++)
+        Parallelism.ForRanges(patterns, (start, end) =>
         {
-            store.Get(p, pattern);
-            Rotations[p] = (byte)shape.DistinctRotations(pattern);
+            var pattern = shape.NewPattern();
+            for (var p = start; p < end; p++)
+            {
+                store.Get(p, pattern);
+                Rotations[p] = (byte)shape.DistinctRotations(pattern);
+            }
+        });
+        var oriented = new List<int>();
+        for (var p = 0; p < patterns; p++)
             for (var r = 0; r < Rotations[p]; r++)
                 oriented.Add(4 * p + r);
-        }
-
         AllIds = oriented.ToArray();
+        progress(0.2f);
 
-        // first each id's own face slot per direction (face values are interned per direction), giving the tables;
-        // then, in the same array, the slot its faces match on the other side
+        // each id's own face slot per direction, with face values interned per direction, one thread per direction;
+        // slots are numbered in id order, as on one thread. Then the tables from them.
         var slots = new int[patterns * 4 * 6];
         var faceSlots = new Dictionary<(ulong, ulong), int>[6];
-        for (var d = 0; d < 6; d++)
-            faceSlots[d] = new Dictionary<(ulong, ulong), int>();
-        ForEachFace((id, d, face) =>
+        Parallelism.For(6, d =>
         {
-            if (!faceSlots[d].TryGetValue(face, out var slot))
-                faceSlots[d][face] = slot = faceSlots[d].Count;
-            slots[id * 6 + d] = slot;
+            var interned = faceSlots[d] = new Dictionary<(ulong, ulong), int>();
+            ForEachFace(0, patterns, d, (id, face) =>
+            {
+                if (!interned.TryGetValue(face, out var slot))
+                    interned[face] = slot = interned.Count;
+                slots[id * 6 + d] = slot;
+            });
         });
-
-        offsets = new int[6][];
-        ids = new int[6][];
-        for (var d = 0; d < 6; d++)
+        progress(0.6f);
+        Parallelism.For(6, d =>
         {
             faceValues[d] = faceSlots[d].Count;
             var counts = new int[faceValues[d] + 1];
@@ -77,11 +83,22 @@ public sealed class WfcPatternIndex
                 list[fill[slots[id * 6 + d]]++] = id;
             offsets[d] = counts;
             ids[d] = list;
-        }
+        });
+        progress(0.8f);
 
+        // in the same array, the slot each face matches on the other side; the dictionaries are only read now
         neighbourSlots = slots;
-        ForEachFace((id, d, face) =>
-            neighbourSlots[id * 6 + d] = faceSlots[d ^ 1].TryGetValue(face, out var slot) ? slot : -1);
+        Parallelism.ForRanges(patterns, (start, end) =>
+        {
+            for (var d = 0; d < 6; d++)
+            {
+                var matching = faceSlots[d ^ 1];
+                var direction = d;
+                ForEachFace(start, end, d, (id, face) =>
+                    neighbourSlots[id * 6 + direction] = matching.TryGetValue(face, out var slot) ? slot : -1);
+            }
+        });
+        progress(1);
     }
 
     public WfcPatternShape Shape { get; }
@@ -146,7 +163,8 @@ public sealed class WfcPatternIndex
         return store.Find(canonical) >= 0;
     }
 
-    // every window of every source, stride 1, no wrapping
+    // every window of every source, stride 1, no wrapping. The heights of each map are scanned in parallel into
+    // stores of their own, which are merged in height order, so patterns are numbered as on one thread.
     public static WfcPatternIndex Learn(WfcPatternShape shape, IEnumerable<VoxelMap> sources,
         Action<float>? progress = null)
     {
@@ -155,105 +173,85 @@ public sealed class WfcPatternIndex
         if (maps.Count == 0)
             throw new GenerationFailedException(TooSmallKey, $"No source map is at least {shape}");
         var store = new WfcPatternStore(shape);
-        var bands = maps.Max(map => (map.SizeZ - shape.Height + shape.StrideUp / 2) / shape.StrideUp) + 1;
+        var bands = maps.Max(map => BandOf(shape, map.SizeZ - shape.Height)) + 1;
         var bandCounts = new List<int>();
         long windows = 0;
+        var pattern = shape.NewPattern();
         for (var s = 0; s < maps.Count; s++)
         {
-            ForEachWindow(shape, maps[s], (z, canonical) =>
+            var patches = WindowPatches.Build(shape, maps[s]);
+            var heights = maps[s].SizeZ - shape.Height + 1;
+            var slices = new (WfcPatternStore Store, List<int> Counts)[heights];
+            Parallelism.For(heights, z =>
             {
-                var p = store.AddOrFind(canonical, out var added);
-                if (added)
-                    for (var b = 0; b < bands; b++)
-                        bandCounts.Add(0);
-                bandCounts[p * bands + (z + shape.StrideUp / 2) / shape.StrideUp]++;
-                windows++;
-            }, fraction => progress?.Invoke(0.8f * (s + fraction) / maps.Count));
+                var slice = new WfcPatternStore(shape);
+                var counts = new List<int>();
+                patches.ForEach(z, canonical =>
+                {
+                    var id = slice.AddOrFind(canonical, out var added);
+                    if (added)
+                        counts.Add(0);
+                    counts[id]++;
+                });
+                slices[z] = (slice, counts);
+            });
+
+            for (var z = 0; z < heights; z++)
+            {
+                var (slice, counts) = slices[z];
+                var band = BandOf(shape, z);
+                for (var id = 0; id < slice.Count; id++)
+                {
+                    slice.Get(id, pattern);
+                    var p = store.AddOrFind(pattern, out var added);
+                    if (added)
+                        for (var b = 0; b < bands; b++)
+                            bandCounts.Add(0);
+                    bandCounts[p * bands + band] += counts[id];
+                    windows += counts[id];
+                }
+
+                slices[z] = default;
+            }
+
+            progress?.Invoke(0.6f * (s + 1) / maps.Count);
         }
 
         store.Trim();
-        var index = new WfcPatternIndex(shape, store, bandCounts.ToArray(), bands, windows);
-        progress?.Invoke(1);
-        return index;
+        return new WfcPatternIndex(shape, store, bandCounts.ToArray(), bands, windows,
+            fraction => progress?.Invoke(0.6f + 0.4f * fraction));
     }
 
-    // calls visit with the height and canonical pattern of every window of the map, stride 1; the pattern array is
-    // reused between calls
-    public static void ForEachWindow(WfcPatternShape shape, VoxelMap map, Action<int, ulong[]> visit,
-        Action<float>? progress = null)
+    private static int BandOf(WfcPatternShape shape, int z)
     {
-        int w = shape.Width, h = shape.Height;
-        int across = map.SizeX - w + 1, deep = map.SizeY - w + 1;
-        // per layer: the w x w patch starting at each (x, y), as bits x + w * y in two words, built from rows of w
-        var low = new ulong[map.SizeZ][];
-        var high = new ulong[map.SizeZ][];
-        var rows = new ulong[across * map.SizeY];
-        for (var z = 0; z < map.SizeZ; z++)
+        return (z + shape.StrideUp / 2) / shape.StrideUp;
+    }
+
+    // calls visit with the height and canonical pattern of every window of the map, stride 1, on this thread; the
+    // pattern array is reused between calls
+    public static void ForEachWindow(WfcPatternShape shape, VoxelMap map, Action<int, ulong[]> visit)
+    {
+        var patches = WindowPatches.Build(shape, map);
+        for (var z = 0; z + shape.Height <= map.SizeZ; z++)
         {
-            for (var y = 0; y < map.SizeY; y++)
-            for (var x = 0; x < across; x++)
-            {
-                ulong row = 0;
-                for (var dx = 0; dx < w; dx++)
-                    if (map[x + dx, y, z])
-                        row |= 1UL << dx;
-                rows[y * across + x] = row;
-            }
-
-            low[z] = new ulong[across * deep];
-            high[z] = new ulong[across * deep];
-            for (var y = 0; y < deep; y++)
-            for (var x = 0; x < across; x++)
-            {
-                ulong patchLow = 0, patchHigh = 0;
-                for (var dy = 0; dy < w; dy++)
-                {
-                    var row = rows[(y + dy) * across + x];
-                    var shift = w * dy;
-                    if (shift >= 64)
-                        patchHigh |= row << (shift - 64);
-                    else
-                    {
-                        patchLow |= row << shift;
-                        if (shift > 0 && shift + w > 64)
-                            patchHigh |= row >> (64 - shift);
-                    }
-                }
-
-                low[z][y * across + x] = patchLow;
-                high[z][y * across + x] = patchHigh;
-            }
-        }
-
-        var pattern = shape.NewPattern();
-        var scratch = shape.NewPattern();
-        for (var z = 0; z + h <= map.SizeZ; z++)
-        {
-            for (var i = 0; i < across * deep; i++)
-            {
-                for (var dz = 0; dz < h; dz++)
-                {
-                    pattern[2 * dz] = low[z + dz][i];
-                    pattern[2 * dz + 1] = high[z + dz][i];
-                }
-
-                shape.Canonicalize(pattern, scratch);
-                visit(z, pattern);
-            }
-
-            progress?.Invoke((z + 1f) / (map.SizeZ - h + 1));
+            var height = z;
+            patches.ForEach(z, canonical => visit(height, canonical));
         }
     }
 
-    private void ForEachFace(Action<int, int, (ulong, ulong)> visit)
+    // calls visit with each oriented id of patterns start .. end - 1 and its face on side direction
+    private void ForEachFace(int start, int end, int direction, Action<int, (ulong, ulong)> visit)
     {
         var pattern = Shape.NewPattern();
-        for (var p = 0; p < Rotations.Length; p++)
+        for (var p = start; p < end; p++)
         {
             store.Get(p, pattern);
-            for (var r = 0; r < Rotations[p]; r++, Shape.Rotate(pattern))
-                for (var d = 0; d < 6; d++)
-                    visit(4 * p + r, d, Shape.Face(pattern, d));
+            for (var r = 0; r < Rotations[p]; r++)
+            {
+                if (r > 0)
+                    Shape.Rotate(pattern);
+                visit(4 * p + r, Shape.Face(pattern, direction));
+            }
         }
     }
 
@@ -280,6 +278,89 @@ public sealed class WfcPatternIndex
                     6L * OrientedCount * 4 + faceValues.Sum(count => count + 1L) * 4;
         text.Append($"  index memory about {bytes / (1024.0 * 1024.0):F0} MB");
         return text.ToString();
+    }
+
+    // the Width x Width patch of each layer of a map at each (x, y), as bits x + Width * y in two words, so a window
+    // is just Height patches stacked
+    private sealed class WindowPatches
+    {
+        private readonly WfcPatternShape shape;
+        private readonly int count;
+        private readonly ulong[][] low;
+        private readonly ulong[][] high;
+
+        private WindowPatches(WfcPatternShape shape, int count, ulong[][] low, ulong[][] high)
+        {
+            this.shape = shape;
+            this.count = count;
+            this.low = low;
+            this.high = high;
+        }
+
+        // built from rows of Width voxels, layers in parallel
+        public static WindowPatches Build(WfcPatternShape shape, VoxelMap map)
+        {
+            var w = shape.Width;
+            int across = map.SizeX - w + 1, deep = map.SizeY - w + 1;
+            var low = new ulong[map.SizeZ][];
+            var high = new ulong[map.SizeZ][];
+            Parallelism.For(map.SizeZ, z =>
+            {
+                var rows = new ulong[across * map.SizeY];
+                for (var y = 0; y < map.SizeY; y++)
+                for (var x = 0; x < across; x++)
+                {
+                    ulong row = 0;
+                    for (var dx = 0; dx < w; dx++)
+                        if (map[x + dx, y, z])
+                            row |= 1UL << dx;
+                    rows[y * across + x] = row;
+                }
+
+                var layerLow = low[z] = new ulong[across * deep];
+                var layerHigh = high[z] = new ulong[across * deep];
+                for (var y = 0; y < deep; y++)
+                for (var x = 0; x < across; x++)
+                {
+                    ulong patchLow = 0, patchHigh = 0;
+                    for (var dy = 0; dy < w; dy++)
+                    {
+                        var row = rows[(y + dy) * across + x];
+                        var shift = w * dy;
+                        if (shift >= 64)
+                            patchHigh |= row << (shift - 64);
+                        else
+                        {
+                            patchLow |= row << shift;
+                            if (shift > 0 && shift + w > 64)
+                                patchHigh |= row >> (64 - shift);
+                        }
+                    }
+
+                    layerLow[y * across + x] = patchLow;
+                    layerHigh[y * across + x] = patchHigh;
+                }
+            });
+            return new WindowPatches(shape, across * deep, low, high);
+        }
+
+        // visits the canonical pattern of every window starting at height z; the array is reused between calls
+        public void ForEach(int z, Action<ulong[]> visit)
+        {
+            var pattern = shape.NewPattern();
+            var scratch = shape.NewPattern();
+            for (var i = 0; i < count; i++)
+            {
+                for (var dz = 0; dz < shape.Height; dz++)
+                {
+                    pattern[2 * dz] = low[z + dz][i];
+                    pattern[2 * dz + 1] = high[z + dz][i];
+                }
+
+                shape.Canonicalize(pattern, scratch);
+                visit(pattern);
+            }
+        }
     }
 }
 

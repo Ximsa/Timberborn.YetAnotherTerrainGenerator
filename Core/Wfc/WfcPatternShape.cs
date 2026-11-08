@@ -136,11 +136,21 @@ public sealed class WfcPatternShape
         var fixedAt = direction % 2 == 0 ? Width - 1 : 0;
         ulong face = 0;
         for (var z = 0; z < Height; z++)
-        for (var i = 0; i < Width; i++)
         {
-            var solid = direction < 2 ? Voxel(pattern, fixedAt, i, z) : Voxel(pattern, i, fixedAt, z);
-            if (solid)
-                face |= 1UL << (Width * z + i);
+            ulong low = pattern[2 * z], high = pattern[2 * z + 1];
+            ulong line;
+            if (direction >= 2)
+                // a y face is one row of the layer
+                line = Bits(low, high, Width * fixedAt, Width);
+            else
+            {
+                // an x face is one column: one bit from each row
+                line = 0;
+                for (var i = 0; i < Width; i++)
+                    line |= Bits(low, high, fixedAt + Width * i, 1) << i;
+            }
+
+            face |= line << (Width * z);
         }
 
         return (face, 0);
