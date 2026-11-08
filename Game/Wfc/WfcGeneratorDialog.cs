@@ -26,9 +26,6 @@ public class WfcGeneratorDialog : TerrainJobDialog
     private const string LearningKey = "Ximsa.TerrainGenerator.Progress.Learning";
     private const string SolvingKey = "Ximsa.TerrainGenerator.Progress.Solving";
 
-    // checked by default, besides the current map
-    private const string DefaultBuiltInMap = "Diorama";
-
     private readonly VisualElement generateButton;
     private readonly DialogBoxShower dialogBoxShower;
     private readonly MapRepository mapRepository;
@@ -44,24 +41,25 @@ public class WfcGeneratorDialog : TerrainJobDialog
         this.dialogBoxShower = dialogBoxShower;
         SetTitle(loc.T(TitleKey));
 
-        // sources: the current map and Diorama up front, all other maps behind "More maps"
+        // sources: the current map up front, all other maps behind "More maps"
         Content.AddLabel(loc.T(SourcesKey), SourcesKey);
-        Content.AddGamePanelToggle(loc.T(CurrentMapKey), selected =>
+        var currentMap = Content.AddGamePanelToggle(loc.T(CurrentMapKey), selected =>
         {
             useCurrentMap = selected;
             UpdateGenerateButton();
-        }).SetValueWithoutNotify(true);
-        var builtInNames = mapRepository.GetBuiltinMapNames().Where(name => !name.StartsWith("_")).ToList();
-        if (builtInNames.Contains(DefaultBuiltInMap))
-            AddMapToggle(Content, DefaultBuiltInMap, MapFileReference.FromResource(DefaultBuiltInMap), true);
+        });
+        currentMap.SetValueWithoutNotify(true);
+        AlignLeft(currentMap);
 
         var moreMaps = new VisualElement();
+        // full width, so its checkboxes can sit on the left like the one above
+        moreMaps.style.alignSelf = Align.Stretch;
         moreMaps.AddLabel(loc.T(BuiltInMapsKey), BuiltInMapsKey);
-        foreach (var name in builtInNames.Where(name => name != DefaultBuiltInMap))
-            AddMapToggle(moreMaps, name, MapFileReference.FromResource(name), false);
+        foreach (var name in mapRepository.GetBuiltinMapNames().Where(name => !name.StartsWith("_")))
+            AddMapToggle(moreMaps, name, MapFileReference.FromResource(name));
         moreMaps.AddLabel(loc.T(UserMapsKey), UserMapsKey);
         foreach (var name in mapRepository.GetUserMapNames())
-            AddMapToggle(moreMaps, name, MapFileReference.FromUserFolder(name), false);
+            AddMapToggle(moreMaps, name, MapFileReference.FromUserFolder(name));
         moreMaps.SetDisplay(false);
         var moreMapsShown = false;
         Content.AddButton(loc.T(MoreMapsKey), MoreMapsKey, () => moreMaps.SetDisplay(moreMapsShown = !moreMapsShown));
@@ -88,18 +86,23 @@ public class WfcGeneratorDialog : TerrainJobDialog
         UpdateGenerateButton();
     }
 
-    private void AddMapToggle(VisualElement parent, string name, MapFileReference reference, bool selected)
+    private void AddMapToggle(VisualElement parent, string name, MapFileReference reference)
     {
-        if (selected)
-            selectedMaps.Add(reference);
-        parent.AddGamePanelToggle(name, isSelected =>
+        var toggle = parent.AddGamePanelToggle(name, isSelected =>
         {
             if (isSelected)
                 selectedMaps.Add(reference);
             else
                 selectedMaps.Remove(reference);
             UpdateGenerateButton();
-        }).SetValueWithoutNotify(selected);
+        });
+        AlignLeft(toggle);
+    }
+
+    // the dialog centres its content; checkboxes read better in a left-aligned column
+    private static void AlignLeft(VisualElement element)
+    {
+        element.style.alignSelf = Align.FlexStart;
     }
 
     protected override void ShowFailure(string message)

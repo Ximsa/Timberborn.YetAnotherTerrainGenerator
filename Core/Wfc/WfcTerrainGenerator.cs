@@ -5,8 +5,8 @@ namespace Timberborn.TerrainGenerator.Core.Wfc;
 public sealed class WfcSettings
 {
     // pattern size in voxels: width across (x and y), height up
-    public int PatternWidth = 6;
-    public int PatternHeight = 4;
+    public int PatternWidth = 7;
+    public int PatternHeight = 5;
 
     // removed placements per attempt before starting over
     public int MaxDeletions = 2000;

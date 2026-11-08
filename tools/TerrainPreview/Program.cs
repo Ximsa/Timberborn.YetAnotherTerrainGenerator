@@ -12,7 +12,7 @@ using TerrainPreview;
 //   TerrainPreview wfc --sources a.timber,b.timber|<folder> [--size 128x128x16] [--seed 1] [--seeds 1-8]
 //       [--deletions 2000] [--attempts 10] [--lookahead true] [--clear-every 8] [--penalty 0.25] --out preview.png
 //   TerrainPreview wfc-test --sources a.timber   (checks the pattern encoding)
-//   (wfc: --width 6 --height 4 set the pattern size)
+//   (wfc: --width 7 --height 5 set the pattern size)
 //   TerrainPreview map <file.timber> --out preview.png
 //   TerrainPreview sharpen <file.timber> [--region 4] [--min-area 32] [--step 2] [--strength 0.5] --out preview.png
 //   TerrainPreview trees <file.timber> [--forest 0.2] [--bush 0.12] [--patch 32] [--clump 6]
@@ -60,8 +60,8 @@ switch (args[0])
             MaxDeletions = int.Parse(options.GetValueOrDefault("deletions", "2000")),
             MaxAttempts = int.Parse(options.GetValueOrDefault("attempts", "10")),
             Lookahead = options.GetValueOrDefault("lookahead", "true") == "true",
-            PatternWidth = int.Parse(options.GetValueOrDefault("width", "6")),
-            PatternHeight = int.Parse(options.GetValueOrDefault("height", "4")),
+            PatternWidth = int.Parse(options.GetValueOrDefault("width", "7")),
+            PatternHeight = int.Parse(options.GetValueOrDefault("height", "5")),
             ClearEvery = int.Parse(options.GetValueOrDefault("clear-every", "8")),
             HeightPenalty = double.Parse(options.GetValueOrDefault("penalty", "0.25"), System.Globalization.CultureInfo.InvariantCulture)
         };

@@ -34,7 +34,7 @@ Offline previews: `tools/TerrainPreview` renders the generators and any `.timber
 | Floating terrain | Keep floating chunks, like beta |
 | Extras | Terrain only: no water sources, trees or bushes |
 | WFC model | Overlapping model on **3D voxels**, learning from one or more source maps |
-| WFC sources | A checklist of maps: the current map and Diorama are checked by default; the other built-in maps (Cliffside and the rest) and your own saved maps appear when the list is expanded |
+| WFC sources | A checklist of maps: only the current map is checked by default (Diorama too until 2026-11-08); all built-in maps and your own saved maps appear, unchecked and left-aligned, when "More maps" is expanded |
 | Button group | Native game tool group (`ToolGroupSpec` blueprint plus a tool per generator) |
 | Smoothing button | Stays outside the generator group; in the next step it moves into a second group of terrain tools |
 | Icons | Placeholder PNGs for now, to be replaced later |

@@ -15,7 +15,7 @@ Replaces the coarse-block overlapping WFC (see `terrain-generators-plan.md`, Pha
 | 6 Novelty, vertical profile | Done in the preview tool; height weights added (see decisions) |
 | 7 Multi-level tables (§12) | Not started; candidate lookup is not the bottleneck at 128 x 128 |
 | 8 Cell selection order (§13) | Not started |
-| Pattern size setting | Done: width 4-10 across, height 4-6 up in the dialog, 6 x 6 x 4 by default (2026-11-08); `wfc-test` checks 4x4x4, 6x6x4, 8x8x5, 9x9x6, 10x10x6 |
+| Pattern size setting | Done: width 4-10 across, height 4-6 up in the dialog, 7 x 7 x 5 by default (2026-11-08; Diorama alone solves in 1-10 attempts, at most 3 s, Plains alone in 1); `wfc-test` checks 4x4x4, 6x6x4, 8x8x5, 9x9x6, 10x10x6 |
 | In game | 4 x 4 x 4 tested with 10 maps (solved, 3.6 s); one small map alone failed and raised the game's error report, now a message box instead. Pattern size sliders and the message box not yet tested in game |
 
 ## Decisions and deviations from the spec
